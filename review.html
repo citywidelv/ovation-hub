@@ -275,7 +275,7 @@ function buildPdf(open){
     return Promise.all(pids.map(function(pid){ return imgSize(S.photos[pid]).then(function(s){ sizes[pid] = s; }); })).then(function(){ return render(lg, sizes); });
   }).then(function(doc){
     var blob = doc.output("blob");
-    S.pdf = doc.output("datauristring");
+    S.pdf = doc.output("datauristring").replace(/^data:application\/pdf;[^,]*base64,/, "data:application/pdf;base64,");   /* jsPDF adds ;filename=... which the server does not accept */
     S.pdfName = (isCheck ? "Porter Report - " : "City Wide Report - ") + d.property + " - " + (isCheck ? d.service_date : String(d.created_at || "").slice(0, 10)) + ".pdf";
     if(open){ var url = URL.createObjectURL(blob); window.open(url, "_blank"); }
     btn.disabled = false; btn.textContent = "Build PDF";
