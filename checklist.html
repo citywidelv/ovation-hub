@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Porter Daily Checklist | Ovation Hub</title>
-<!-- build 2026-10-22: Porter Daily Checklist for the awarded Ovation properties. Areas and tasks come
+<!-- build 2026-10-22b: Start over button (two taps) clears the draft, the saved photos and every field.
+     build 2026-10-22: Porter Daily Checklist for the awarded Ovation properties. Areas and tasks come
      from the Aspire at Redwood day porter workflow (OV.AREAS in ov-shared.js). 1 to 2 photos per area.
      Saves to the phone as the porter works (localStorage + IndexedDB photos), then kind ov_submit and
      ov_photo_put one photo at a time. No email. The FSM reviews it in review.html. -->
@@ -34,7 +35,7 @@
 <div id="resume"></div>
 
 <div class="card" id="s1">
-<h2>Today</h2>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px"><h2 style="margin:0">Today</h2><button type="button" class="btn ghost sm" id="reset">Start over</button></div>
 <div class="field"><label for="prop">Property <span class="req">*</span></label><select id="prop"></select></div>
 <div class="row2">
 <div class="field"><label for="date">Date <span class="req">*</span></label><input type="date" id="date"></div>
@@ -325,6 +326,26 @@ $("submit").addEventListener("click", function(){
     if(/passcode/i.test(m)) return OV.locked(m);
     $("ferr").textContent = /fetch|network|json/i.test(m) ? "Could not reach City Wide. Check your signal and tap Submit again. Nothing is lost." : m;
   });
+});
+
+/* ---------- start over (two taps, no popup) ---------- */
+var resetArmed = null;
+$("reset").addEventListener("click", function(){
+  var b = $("reset");
+  if(!resetArmed){
+    b.textContent = "Tap again to clear everything"; b.classList.remove("ghost"); b.classList.add("dark");
+    resetArmed = setTimeout(function(){ resetArmed = null; b.textContent = "Start over"; b.classList.add("ghost"); b.classList.remove("dark"); }, 4000);
+    return;
+  }
+  clearTimeout(resetArmed); resetArmed = null;
+  var oldId = S.id;
+  OV.clearDraft("checklist"); OV.photoDrop(oldId + ":");
+  S = blank(); THUMBS = {}; open = {};
+  $("prop").value = ""; $("date").value = S.service_date; $("porter").value = ""; $("start").value = ""; $("end").value = "";
+  $("followups").value = ""; $("supplies").value = ""; $("confirm").checked = false; $("ferr").textContent = "";
+  applyPropertyDefaults(); dayline(); renderPasses(); renderFu(); renderAreas(); renderFuPhotos();
+  b.textContent = "Start over"; b.classList.add("ghost"); b.classList.remove("dark");
+  window.scrollTo({ top:0, behavior:"smooth" });
 });
 
 applyPropertyDefaults();
