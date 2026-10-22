@@ -1,4 +1,4 @@
-/* Ovation Hub styles. Build 2026-10-22. Mobile first: porters and community managers use phones. */
+/* Ovation Hub styles. Build 2026-10-22b (phone pass: 44px rows and buttons under 600px, header collapses to the title, no tap highlight flash). Mobile first: porters and community managers use phones. */
 :root{--red:#D22730;--red-dark:#B01F27;--black:#2D2A26;--grey:#636466;--light:#F5F5F5;--border:#E5E5E5;--gold:#E5B423;--teal:#0AA6A9;--white:#fff;--ok:#1f8a4c;--okbg:#eaf6ee;--warnbg:#fdf3f3}
 *{margin:0;padding:0;box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
@@ -128,3 +128,36 @@ footer.foot a{color:var(--grey);font-weight:700;text-decoration:none}
 .pill.new{background:#fdecec;color:var(--red)}
 .pill.reviewed{background:#fff6dd;color:#8a6500}
 .pill.sent{background:var(--okbg);color:var(--ok)}
+
+.modal{position:fixed;inset:0;background:rgba(45,42,38,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal .box{background:var(--white);border-radius:12px;max-width:560px;width:100%;padding:20px;max-height:92vh;overflow:auto}
+.modal h3{font-size:1.05rem;margin-bottom:10px}
+/* ---------- phone pass ---------- */
+*{-webkit-tap-highlight-color:transparent}
+button,.chip,.btn,.check,.ahead,.tile,.add{touch-action:manipulation}
+@media(max-width:600px){
+  header.top .bar{padding:8px 12px;gap:8px}
+  header.top img{height:26px}
+  header.top .tag{font-size:0;border-left-width:2px;padding-left:8px;line-height:1.2}
+  header.top .tag b{font-size:12px}
+  header.top a.back{font-size:13px;white-space:nowrap}
+  main.wrap{padding:14px 12px 90px}
+  .card{padding:14px 12px;border-radius:10px}
+  h1{font-size:1.2rem}
+  .btn.sm{min-height:44px}
+  .check{min-height:48px;padding:10px 2px}
+  .chip{min-height:44px}
+  .chips.big .chip{flex:1 1 100%}
+  .area .ahead{padding:12px 12px;min-height:56px}
+  .area .abody{padding:4px 12px 14px}
+  .photos .pgrid{grid-template-columns:repeat(3,1fr)}
+  .sticky .in .btn{min-width:140px;padding:12px 14px}
+  .tile{padding:16px}
+  .modal{padding:8px;align-items:flex-end}
+  .modal .box{padding:16px 14px;max-height:96vh;border-radius:12px 12px 0 0}
+  .btnrow .btn{flex:1 1 100%}
+}
+@media(max-width:380px){
+  .row2{grid-template-columns:1fr}
+  .photos .pgrid{grid-template-columns:repeat(2,1fr)}
+}

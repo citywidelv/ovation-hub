@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Porter Daily Checklist | Ovation Hub</title>
-<!-- build 2026-10-22b: Start over button (two taps) clears the draft, the saved photos and every field.
+<!-- build 2026-10-22c: photos are asked for, not forced (warning before submit lists areas with none, Submit without photos allowed); photo button offers camera or library; "Picking up where you left off" note when a saved draft restores.
+     build 2026-10-22b: Start over button (two taps) clears the draft, the saved photos and every field.
      build 2026-10-22: Porter Daily Checklist for the awarded Ovation properties. Areas and tasks come
      from the Aspire at Redwood day porter workflow (OV.AREAS in ov-shared.js). 1 to 2 photos per area.
      Saves to the phone as the porter works (localStorage + IndexedDB photos), then kind ov_submit and
@@ -30,7 +31,7 @@
 
 <main class="wrap" id="form">
 <h1>Porter Daily Checklist</h1>
-<div class="lead">Work through the areas, tick what you did, add 1 or 2 photos per area. Everything saves on this phone as you go.</div>
+<div class="lead">Work through the areas, tick what you did, add 1 or 2 photos per area. Everything saves on this phone as you go, so you can come back to it through the day.</div>
 
 <div id="resume"></div>
 
@@ -74,7 +75,7 @@
 <label class="check" style="border:0"><input type="checkbox" id="confirm"><span>The tasks I checked above were completed today, and the photos are from this shift.</span></label>
 <div class="err" id="ferr"></div>
 </div>
-<input type="file" id="pfile" accept="image/*" capture="environment" class="hidden">
+<input type="file" id="pfile" accept="image/*" class="hidden">
 </main>
 
 <div class="sticky" id="bar">
@@ -109,8 +110,9 @@ function blank(){
       photos: [] }; }),
     followups:"", followup_tags:[], photos:[], supplies:"", status:"New" };
 }
-var S = OV.loadDraft("checklist") || blank();
-if(!S.id || !/^ovc_/.test(S.id)) S = blank();
+var RESTORED = OV.loadDraft("checklist");
+var S = RESTORED || blank();
+if(!S.id || !/^ovc_/.test(S.id)){ S = blank(); RESTORED = null; }
 var THUMBS = {};   /* pid -> thumb data uri, memory only */
 var open = {};     /* area key -> expanded */
 
@@ -157,10 +159,10 @@ function areaState(a){
   if(a.na) return { cls:"na", st:"Not today", ok:true };
   var daily = a.tasks.filter(function(t){ return t.f === "daily"; });
   var done = daily.filter(function(t){ return t.done; }).length;
-  var needPhoto = !def.photoOptional && a.photos.length < 1;
-  var complete = done === daily.length && !needPhoto;
-  var st = done + "/" + daily.length + (needPhoto ? " · photo needed" : (a.photos.length ? " · " + a.photos.length + " photo" + (a.photos.length > 1 ? "s" : "") : ""));
-  return { cls: complete ? "complete" : "", st:st, ok:complete, need: needPhoto || (done > 0 && done < daily.length) };
+  var wantPhoto = !def.photoOptional && a.photos.length < 1;
+  var complete = done === daily.length;
+  var st = done + "/" + daily.length + (a.photos.length ? " · " + a.photos.length + " photo" + (a.photos.length > 1 ? "s" : "") : (wantPhoto ? " · add a photo" : ""));
+  return { cls: complete ? "complete" : "", st:st, ok:complete, need: (done > 0 && done < daily.length) || (complete && wantPhoto) };
 }
 function renderAreas(){
   var host = $("areas");
@@ -184,7 +186,7 @@ function renderAreas(){
       h += '</div>';
       h += '<div class="photos"><div class="grp">Photos' + (def.photoOptional ? ' (optional)' : ' (1 to 2)') + '</div><div class="pgrid">';
       a.photos.forEach(function(p, i){ h += '<div class="ph"><img src="' + (THUMBS[p.pid] || "") + '" alt=""><button type="button" class="rm" data-rm="' + a.key + ':' + i + '" aria-label="Remove photo">&times;</button></div>'; });
-      if(a.photos.length < 2) h += '<div class="add' + (!def.photoOptional && !a.photos.length ? ' req' : '') + '" data-add="' + a.key + '"><span class="big">+</span>' + (a.photos.length ? 'Add 2nd photo' : 'Take photo') + '</div>';
+      if(a.photos.length < 2) h += '<div class="add' + (!def.photoOptional && !a.photos.length ? ' req' : '') + '" data-add="' + a.key + '"><span class="big">+</span>' + (a.photos.length ? 'Add 2nd photo' : 'Take or upload photo') + '</div>';
       h += '</div></div>';
       h += '<div class="field" style="margin-top:10px"><label>Note for this area (optional)</label><input type="text" data-note="' + a.key + '" value="' + esc(a.note || "") + '" placeholder="Anything the property should know"></div>';
     }
@@ -237,7 +239,7 @@ $("pfile").addEventListener("change", function(){
 function renderFuPhotos(){
   var g = $("fuGrid");
   g.innerHTML = (S.photos || []).map(function(p, i){ return '<div class="ph"><img src="' + (THUMBS[p.pid] || "") + '" alt=""><button type="button" class="rm" data-i="' + i + '" aria-label="Remove">&times;</button></div>'; }).join("") +
-    ((S.photos || []).length < 4 ? '<div class="add" id="fuAdd"><span class="big">+</span>Add photo</div>' : "");
+    ((S.photos || []).length < 4 ? '<div class="add" id="fuAdd"><span class="big">+</span>Take or upload</div>' : "");
   var add = $("fuAdd"); if(add) add.addEventListener("click", function(){ pendingArea = "fu"; $("pfile").value = ""; $("pfile").click(); });
   g.querySelectorAll(".rm").forEach(function(b){ b.addEventListener("click", function(){ var ph = S.photos.splice(Number(b.getAttribute("data-i")), 1)[0]; if(ph){ delete THUMBS[ph.pid]; OV.photoDrop(S.id + ":" + ph.pid); } renderFuPhotos(); persist(); bar(); }); });
   bar();
@@ -270,21 +272,57 @@ function resumeUpload(id, btn){
 }
 renderResume();
 
+/* Saved progress from earlier today (or an unfinished day) comes back as it was left. */
+function renderRestored(){
+  if(!RESTORED) return;
+  var touched = S.property || S.porter || S.areas.some(function(a){ return a.photos.length || a.tasks.some(function(t){ return t.done; }); }) || S.passes.some(function(p){ return p.done; });
+  if(!touched) return;
+  var c = counts();
+  var stale = S.service_date && S.service_date !== OV.today();
+  var el = document.createElement("div");
+  el.className = "note " + (stale ? "warn" : "ok"); el.id = "restoredNote";
+  el.innerHTML = "<b>Picking up where you left off.</b> " + (S.property ? esc(S.property) + ", " : "") + esc(S.weekday || OV.weekday(S.service_date)) + " " + esc(S.service_date) + " · " + c.done + " of " + c.total + " areas done · " + c.photos + " photo" + (c.photos === 1 ? "" : "s") + "." +
+    (stale ? " <b>This checklist is dated " + esc(S.service_date) + ", not today.</b> Submit it if it is finished, or tap Start over for today." : " Keep adding as you go. Everything stays on this phone until you submit.");
+  $("resume").appendChild(el);
+}
+renderRestored();
+
 /* ---------- submit ---------- */
 function validateForm(){
   if(!S.property) return "Pick the property.";
   if(!S.service_date) return "Pick the date.";
   if(!String(S.porter || "").trim()) return "Enter your name.";
-  var missing = S.areas.filter(function(a){ if(a.na) return false; var def = areaDef(a.key); return !def.photoOptional && a.photos.length < 1; });
-  if(missing.length) return "Add at least one photo for: " + missing.map(function(a){ return a.name; }).join(", ") + ".";
   var nothing = S.areas.filter(function(a){ return !a.na && !a.tasks.some(function(t){ return t.done; }); });
   if(nothing.length) return "No tasks are checked in: " + nothing.map(function(a){ return a.name; }).join(", ") + ". Check what you did, or mark the area Not today.";
   if(!$("confirm").checked) return "Tick the confirmation box.";
   return "";
 }
+/* Photos are asked for, not forced. Before submit, say which areas have none and let the porter choose. */
+function photoWarning(){
+  var missing = S.areas.filter(function(a){ if(a.na) return false; var def = areaDef(a.key); return !def.photoOptional && a.photos.length < 1; });
+  var total = counts().photos;
+  if(!missing.length) return null;
+  return { missing: missing, total: total };
+}
+function showPhotoWarning(w, onSubmitAnyway){
+  var m = document.createElement("div"); m.className = "modal";
+  var title = w.total === 0 ? "No photos attached" : "Some areas have no photo";
+  var body = w.total === 0
+    ? "This checklist has no photos. Photos are how the property sees the work was done. Go back and add 1 or 2 per area if you can."
+    : "These areas have no photo yet: <b>" + w.missing.map(function(a){ return esc(a.name); }).join("</b>, <b>") + "</b>. Each area should have 1 or 2 photos.";
+  m.innerHTML = '<div class="box"><h3 style="font-size:1.1rem;margin-bottom:8px">' + title + '</h3><div class="note warn" style="margin:0 0 14px">' + body + '</div>' +
+    '<div class="btnrow"><button type="button" class="btn dark" id="pwBack">Go back and add photos</button><button type="button" class="btn ghost" id="pwGo">Submit without photos</button></div></div>';
+  document.body.appendChild(m);
+  $("pwBack").addEventListener("click", function(){ m.remove(); var first = w.missing[0]; open[first.key] = true; renderAreas(); var el = $("areas").querySelector('.area[data-k="' + first.key + '"]'); if(el) el.scrollIntoView({ behavior:"smooth", block:"start" }); });
+  $("pwGo").addEventListener("click", function(){ m.remove(); onSubmitAnyway(); });
+}
 $("submit").addEventListener("click", function(){
   var e = validateForm(); $("ferr").textContent = e;
   if(e){ $("ferr").scrollIntoView({ behavior:"smooth", block:"center" }); return; }
+  var w = photoWarning();
+  if(w) showPhotoWarning(w, doSubmit); else doSubmit();
+});
+function doSubmit(){
   var btn = $("submit"); btn.disabled = true; btn.textContent = "Submitting...";
   try { localStorage.setItem("cwOvPorter", S.porter); } catch(e2){}
   var doc = JSON.parse(JSON.stringify(S));
@@ -326,7 +364,7 @@ $("submit").addEventListener("click", function(){
     if(/passcode/i.test(m)) return OV.locked(m);
     $("ferr").textContent = /fetch|network|json/i.test(m) ? "Could not reach City Wide. Check your signal and tap Submit again. Nothing is lost." : m;
   });
-});
+}
 
 /* ---------- start over (two taps, no popup) ---------- */
 var resetArmed = null;
@@ -343,6 +381,7 @@ $("reset").addEventListener("click", function(){
   S = blank(); THUMBS = {}; open = {};
   $("prop").value = ""; $("date").value = S.service_date; $("porter").value = ""; $("start").value = ""; $("end").value = "";
   $("followups").value = ""; $("supplies").value = ""; $("confirm").checked = false; $("ferr").textContent = "";
+  RESTORED = null; var rn = $("restoredNote"); if(rn) rn.remove();
   applyPropertyDefaults(); dayline(); renderPasses(); renderFu(); renderAreas(); renderFuPhotos();
   b.textContent = "Start over"; b.classList.add("ghost"); b.classList.remove("dark");
   window.scrollTo({ top:0, behavior:"smooth" });

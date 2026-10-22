@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Report or Request | Ovation Hub</title>
-<!-- build 2026-10-22: Ovation observation / work request form. Cascade: property -> who you are ->
+<!-- build 2026-10-22b: photo button offers camera or photo library (no capture attribute).
+     build 2026-10-22: Ovation observation / work request form. Cascade: property -> who you are ->
      report or request -> category -> detail questions -> photos -> submit (kind ov_submit, Ovation.gs).
      Saves to the CW Ovation Hub book and emails Config!report_notify. No fetch on load. -->
 <link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
@@ -74,7 +75,7 @@
 <div class="card step plain" id="s5">
 <h2>5. Photos <span style="font-weight:400;color:var(--grey);font-size:13px">(optional, up to 4)</span></h2>
 <div class="photos"><div class="pgrid" id="pgrid"></div><div class="pcount" id="pcount"></div></div>
-<input type="file" id="pfile" accept="image/*" capture="environment" class="hidden">
+<input type="file" id="pfile" accept="image/*" class="hidden">
 </div>
 
 <div class="step" id="s6">

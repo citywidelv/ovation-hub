@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Ovation Review Queue | City Wide</title>
-<!-- build 2026-10-22: FSM review queue for the Ovation Hub. Team passcode (CWAuth.require, Ops Hub gate).
+<!-- build 2026-10-22b: phone pass. Under 600px the list hides while an item is open (Back to the list link), 44px rows, name box on its own row.
+     build 2026-10-22: FSM review queue for the Ovation Hub. Team passcode (CWAuth.require, Ops Hub gate).
      Lists porter checklists and Ovation reports (ov_list), opens one (ov_get), lets the FSM edit checks,
      notes and photos (ov_update), builds the PDF in the browser (jsPDF), stores it (ov_pdf_put) and
      emails it to the property (ov_send). Recipients per property live on the Properties tab of the
@@ -22,6 +23,25 @@ main.wrap{max-width:1180px;padding-bottom:40px}
 .filters .btn{width:auto}
 .layout{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
 @media(max-width:900px){.layout{grid-template-columns:1fr}}
+@media(max-width:600px){
+  header.top .bar{flex-wrap:wrap}
+  .who{width:100%;order:3;justify-content:space-between}
+  .who input{flex:1;min-height:44px;font-size:16px}
+  .tabs .chip{flex:1 1 40%;text-align:center;justify-content:center}
+  .tabs a.chip{flex:1 1 100%;font-size:13px}
+  .filters select{flex:1 1 40%;min-height:44px;font-size:16px}
+  .filters .btn{min-height:44px}
+  #bookLink{display:none !important}
+  .rarea .check{min-height:46px;padding:9px 2px}
+  .rarea .check input{width:22px;height:22px}
+  .rarea .rh .chip{min-height:40px}
+  .rarea .pgrid{grid-template-columns:repeat(3,1fr)}
+  .rarea input[type=text]{min-height:44px;font-size:16px}
+  .actions .btn{flex:1 1 45%;min-height:46px}
+  .layout.open .list{display:none}
+  .backlist{display:inline-flex;align-items:center;min-height:44px;font-size:14px;font-weight:700;color:var(--black);text-decoration:none;margin-bottom:6px}
+}
+@media(min-width:601px){.backlist{display:none}}
 .list{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden}
 .item{display:block;width:100%;text-align:left;background:var(--white);border:0;border-bottom:1px solid var(--light);padding:12px 14px;cursor:pointer;font-family:inherit;color:var(--black)}
 .item:hover{background:#faf7f5}
@@ -54,9 +74,7 @@ main.wrap{max-width:1180px;padding-bottom:40px}
 .qa dt{color:var(--grey);font-size:13px}
 .qa dd{font-weight:700}
 @media(max-width:600px){.qa{grid-template-columns:1fr}}
-.modal{position:fixed;inset:0;background:rgba(45,42,38,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
-.modal .box{background:var(--white);border-radius:12px;max-width:560px;width:100%;padding:20px;max-height:92vh;overflow:auto}
-.modal h3{font-size:1.05rem;margin-bottom:10px}
+/* .modal styles live in ov.css */
 .light{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:60;cursor:zoom-out}
 .light img{max-width:96vw;max-height:94vh;border-radius:6px}
 .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--black);color:#fff;font-size:13px;font-weight:700;padding:10px 16px;border-radius:999px;z-index:70;box-shadow:0 6px 20px rgba(0,0,0,.25)}
@@ -156,18 +174,20 @@ function openItem(id, row){
   S.cur = id; S.dirty = false; S.pdf = null; S.photos = {};
   paintList();
   $("detail").innerHTML = '<div class="card plain"><div class="empty">Loading ' + esc(row ? row.property : id) + '...</div></div>';
+  document.querySelector(".layout").classList.add("open");
+  if(window.innerWidth <= 900) window.scrollTo({ top: 0, behavior:"smooth" });
   api("ov_get", { id:id }).then(function(r){
     if(!r.ok) throw new Error(r.error);
     S.doc = r.doc; S.index = r.index; S.files = r.photo_files || {}; S.pdfUrl = r.pdf_url || "";
     S.doc.fsm_notes = S.doc.fsm_notes || "";
     paintDetail();
     loadProps().then(function(){});
-  }).catch(function(e){ $("detail").innerHTML = '<div class="card plain"><div class="empty">' + esc(e.message || e) + '</div></div>'; });
+  }).catch(function(e){ document.querySelector(".layout").classList.remove("open"); $("detail").innerHTML = '<div class="card plain"><div class="empty">' + esc(e.message || e) + '</div></div>'; });
 }
 function status(){ return S.doc.status || S.index.status || "New"; }
 function paintDetail(){
   var d = S.doc, isCheck = S.type === "checklist";
-  var h = '<div class="card plain detail">';
+  var h = '<a href="#" class="backlist" id="backList">&larr; Back to the list</a><div class="card plain detail">';
   h += '<div class="head"><div><h2>' + esc(d.property) + '</h2><div class="meta">' + (isCheck
       ? esc(d.weekday) + ", " + esc(d.service_date) + " · Porter: <b>" + esc(d.porter) + "</b>" + (d.shift_start ? " · " + esc(d.shift_start) + (d.shift_end ? " to " + esc(d.shift_end) : "") : "") + " · submitted " + esc(OV.fmtDate(d.submitted_at || d.created_at))
       : esc(d.mode) + " · " + esc(d.category) + (d.subcategory ? " · " + esc(d.subcategory) : "") + " · from <b>" + esc(d.submitter) + "</b> (" + esc(d.role) + ") · " + esc(OV.fmtDate(d.created_at))) +
@@ -217,6 +237,7 @@ function mark(){ S.dirty = true; }
 function wireDetail(){
   var d = S.doc, host = $("detail");
   $("fsmNotes").addEventListener("input", function(){ d.fsm_notes = $("fsmNotes").value; mark(); });
+  var bl = $("backList"); if(bl) bl.addEventListener("click", function(e){ e.preventDefault(); if(S.dirty && !confirm("You have unsaved edits. Leave without saving?")) return; document.querySelector(".layout").classList.remove("open"); S.cur = null; S.dirty = false; paintList(); $("detail").innerHTML = '<div class="card plain"><div class="empty">Pick an item on the left.</div></div>'; window.scrollTo({ top:0, behavior:"smooth" }); });
   host.querySelectorAll("[data-pass]").forEach(function(c){ c.addEventListener("change", function(){ d.passes[Number(c.getAttribute("data-pass"))].done = c.checked; mark(); }); });
   host.querySelectorAll("[data-task]").forEach(function(c){ c.addEventListener("change", function(){ var p = c.getAttribute("data-task").split(":"); d.areas[Number(p[0])].tasks[Number(p[1])].done = c.checked; c.closest(".check").classList.toggle("done", c.checked); mark(); }); });
   host.querySelectorAll("[data-note]").forEach(function(i){ i.addEventListener("input", function(){ d.areas[Number(i.getAttribute("data-note"))].note = i.value; mark(); }); });
