@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Ovation Review Queue | City Wide</title>
-<!-- build 2026-10-22c: co-brand. Ovation logo beside City Wide in the header and on the PDF band.
+<!-- build 2026-10-22d: header laid out on one row at the page width (back link, logos, title, name box) so nothing overlaps.
+     build 2026-10-22c: co-brand. Ovation logo beside City Wide in the header and on the PDF band.
      build 2026-10-22b: phone pass. Under 600px the list hides while an item is open (Back to the list link), 44px rows, name box on its own row.
      build 2026-10-22: FSM review queue for the Ovation Hub. Team passcode (CWAuth.require, Ops Hub gate).
      Lists porter checklists and Ovation reports (ov_list), opens one (ov_get), lets the FSM edit checks,
@@ -17,6 +18,13 @@
 <style>
 body{background:var(--light)}
 main.wrap{max-width:1180px;padding-bottom:40px}
+header.top .bar{max-width:1180px;gap:18px}
+header.top .bar .back{flex:none;white-space:nowrap}
+header.top .bar .back + .brands{flex:none;justify-content:flex-start}
+header.top .tag{flex:1;min-width:0}
+header.top .tag,header.top .tag b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who{flex:none}
+@media(max-width:900px){header.top .tag{font-size:0}header.top .tag b{font-size:12px}}
 .tabs{display:flex;gap:6px;margin:6px 0 12px;flex-wrap:wrap}
 .tabs .chip{border-radius:10px}
 .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}

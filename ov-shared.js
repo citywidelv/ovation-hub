@@ -1,4 +1,4 @@
-/* Ovation Hub shared layer. Build 2026-10-22.
+/* Ovation Hub shared layer. Build 2026-10-22b (client passcode only; porter pages).
    citywidelv.github.io/ovation-hub/ is a client-facing hub for Ovation Property Management
    staff and the day porters on their properties. Its passcode is its own (script property
    OV_PASSCODE on the CW Team Portal Backend), checked server side by kind ov_auth. The team
@@ -148,8 +148,7 @@
   function getPass(){
     var v = ls(function(){ return localStorage.getItem(KEY); }) || "";
     if(v && !fresh()){ clearPass(); v = ""; }
-    if(!v) v = ls(function(){ return localStorage.getItem(TEAMKEY); }) || "";   /* a team device is already trusted */
-    return v;
+    return v;   /* the team passcode does not open the client side; City Wide staff type the hub passcode once per device */
   }
   function setPass(p){ ls(function(){ localStorage.setItem(KEY, p); }); touch(); }
   function clearPass(){ ls(function(){ localStorage.removeItem(KEY); localStorage.removeItem(STAMP); }); }
@@ -306,7 +305,21 @@
   }
   function today(){ var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 
-  window.OV = { WEBHOOK:WEBHOOK, HUB:HUB, LOGO:LOGO, PROPERTIES:PROPERTIES, GROUPS:GROUPS, AREAS:AREAS, PASSES:PASSES,
+  function porterProp(v){ if(v !== undefined){ ls(function(){ localStorage.setItem("cwOvPorterProp", v || ""); }); return v; } return ls(function(){ return localStorage.getItem("cwOvPorterProp"); }) || ""; }
+  /* Open a base64 PDF. Pass the window opened synchronously in the tap handler (phones block
+     window.open after an await); falls back to a download link. */
+  function openPdf(dataUri, name, win){
+    try {
+      var b64 = dataUri.split(",")[1]; var bin = atob(b64); var bytes = new Uint8Array(bin.length);
+      for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      var blob = new Blob([bytes], { type:"application/pdf" }); var url = URL.createObjectURL(blob);
+      if(win && !win.closed){ win.location.href = url; return true; }
+      var w = window.open(url, "_blank");
+      if(!w){ var a = document.createElement("a"); a.href = url; a.download = name || "report.pdf"; document.body.appendChild(a); a.click(); a.remove(); }
+      return true;
+    } catch(e){ if(win) try { win.close(); } catch(e2){} return false; }
+  }
+  window.OV = { WEBHOOK:WEBHOOK, porterProp:porterProp, openPdf:openPdf, HUB:HUB, LOGO:LOGO, PROPERTIES:PROPERTIES, GROUPS:GROUPS, AREAS:AREAS, PASSES:PASSES,
     esc:esc, uid:uid, $:$, params:params, byName:byName, awarded:awarded, propertyOptions:propertyOptions,
     getPass:getPass, setPass:setPass, clearPass:clearPass, isTeam:isTeam, post:post, api:api, validate:validate, hubGate:hubGate, require:require, locked:locked,
     shrink:shrink, thumb:thumb, uploadPhotos:uploadPhotos, saveDraft:saveDraft, loadDraft:loadDraft, clearDraft:clearDraft,

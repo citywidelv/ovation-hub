@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Past reports | Ovation Hub</title>
+<!-- build 2026-10-22: porter library of submitted checklists. ov_library lists them (no City Wide notes);
+     ov_pdf_get hands back the FSM-built PDF so it opens in a new tab. A checklist City Wide has not reviewed yet
+     shows as waiting. Last list cached on the phone. -->
+<link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
+<link rel="stylesheet" href="ov.css">
+<style>
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.filters select{flex:1;min-width:180px}
+.filters .btn{width:auto}
+.row{background:var(--white);border:1px solid var(--ov-border);border-radius:12px;padding:14px 16px;margin-bottom:10px;display:flex;gap:12px;align-items:center;box-shadow:0 2px 8px rgba(63,58,31,.05)}
+.row .d{flex:none;width:54px;text-align:center;background:var(--ov-cream);border-radius:10px;padding:6px 4px}
+.row .d b{display:block;font-size:18px;line-height:1.1}
+.row .d small{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--grey)}
+.row .t{flex:1;min-width:0}
+.row .t b{display:block;font-size:14px}
+.row .t span{display:block;font-size:12px;color:var(--grey);margin-top:2px}
+.row .btn{width:auto;flex:none;min-height:40px;padding:8px 12px;font-size:13px}
+.row .wait{flex:none;font-size:11px;font-weight:700;color:var(--grey);text-transform:uppercase;letter-spacing:.06em;text-align:right;max-width:90px;line-height:1.3}
+.empty{padding:28px 16px;text-align:center;color:var(--grey);font-size:14px;background:var(--white);border:1px dashed var(--ov-border);border-radius:12px}
+.month{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--grey);margin:16px 0 8px}
+</style>
+<link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
+</head>
+<body>
+<header class="top">
+<div class="bar">
+<a class="back" href="porter.html">&larr; Porter Desk</a>
+<div class="brands"><img class="cw" src="https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png" alt="City Wide Facility Solutions"><span class="div"></span><img class="ovl" src="ovation-logo.svg" alt="Ovation Property Management"></div>
+<div class="tag"><b>Past reports</b>Ovation Hub</div>
+</div>
+</header>
+
+<main class="wrap">
+<h1>Past reports</h1>
+<div class="lead">Checklists submitted from this program. Once City Wide reviews one and sends it to the property, the PDF opens here.</div>
+<div class="filters">
+<select id="prop"></select>
+<button type="button" class="btn ghost sm" id="refresh">Refresh</button>
+</div>
+<div id="list"><div class="empty">Loading...</div></div>
+<div class="err" id="err"></div>
+</main>
+
+<script src="ov-shared.js"></script>
+<script>
+(function(){
+var $ = OV.$, esc = OV.esc;
+if(!OV.require()) return;
+var S = { rows:[] };
+var sel = $("prop");
+sel.innerHTML = OV.propertyOptions(true).replace("Pick the property", "All my properties");
+sel.value = OV.porterProp(); if(sel.value !== OV.porterProp()) sel.value = "";
+sel.addEventListener("change", function(){ OV.porterProp(sel.value); load(); });
+$("refresh").addEventListener("click", load);
+function cacheKey(){ return "cwOvLib_" + (sel.value || "all"); }
+function load(){
+  try { var c = JSON.parse(localStorage.getItem(cacheKey()) || "null"); if(c){ S.rows = c; paint(); } else $("list").innerHTML = '<div class="empty">Loading...</div>'; } catch(e){}
+  OV.api("ov_library", { property: sel.value }).then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.error) || "Could not load");
+    S.rows = r.rows || []; try { localStorage.setItem(cacheKey(), JSON.stringify(S.rows.slice(0, 120))); } catch(e){}
+    paint();
+  }).catch(function(e){ var m = String(e.message || e); if(/passcode/i.test(m)) return OV.locked(m); if(!S.rows.length) $("list").innerHTML = '<div class="empty">' + esc(/fetch|json/i.test(m) ? "Could not reach City Wide. Check your signal and tap Refresh." : m) + '</div>'; });
+}
+function monthOf(ymd){ var p = String(ymd || "").split("-"); if(p.length < 2) return ""; return ["January","February","March","April","May","June","July","August","September","October","November","December"][Number(p[1]) - 1] + " " + p[0]; }
+function paint(){
+  if(!S.rows.length){ $("list").innerHTML = '<div class="empty">No checklists yet' + (sel.value ? " for " + esc(sel.value) : "") + '. Submitted checklists show up here, and the PDF appears once City Wide sends it.</div>'; return; }
+  var h = "", lastM = "";
+  S.rows.forEach(function(r){
+    var m = monthOf(r.service_date); if(m !== lastM){ h += '<div class="month">' + esc(m) + '</div>'; lastM = m; }
+    var day = String(r.service_date || "").split("-")[2] || "";
+    h += '<div class="row"><div class="d"><b>' + esc(day) + '</b><small>' + esc(String(r.weekday || "").slice(0, 3)) + '</small></div>' +
+      '<div class="t"><b>' + esc(r.property) + '</b><span>' + esc(r.porter) + ' · ' + r.areas_done + ' areas · ' + r.tasks_checked + '/' + r.tasks_total + ' tasks · ' + r.photos + ' photo' + (r.photos == 1 ? "" : "s") + '</span></div>' +
+      (r.has_pdf ? '<button type="button" class="btn dark" data-pdf="' + esc(r.id) + '">Open PDF</button>' : '<div class="wait">' + (r.status === "Sent" ? "Sent" : "Waiting for City Wide review") + '</div>') + '</div>';
+  });
+  $("list").innerHTML = h;
+  $("list").querySelectorAll("[data-pdf]").forEach(function(b){ b.addEventListener("click", function(){ openPdf(b.getAttribute("data-pdf"), b); }); });
+}
+function openPdf(id, b){
+  b.disabled = true; b.textContent = "Opening...";
+  var win = null; try { win = window.open("", "_blank"); if(win) win.document.write('<title>Opening report...</title><p style="font-family:Verdana,sans-serif;padding:24px;color:#636466">Opening the report...</p>'); } catch(e){ win = null; }
+  OV.api("ov_pdf_get", { id:id }).then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.error) || "Could not open");
+    if(!OV.openPdf(r.data, r.name, win)) throw new Error("Your browser blocked the PDF. Allow pop-ups for this site and try again.");
+    b.disabled = false; b.textContent = "Open PDF";
+  }).catch(function(e){ if(win) try { win.close(); } catch(e2){} b.disabled = false; b.textContent = "Open PDF"; var m = String(e.message || e); if(/passcode/i.test(m)) return OV.locked(m); $("err").textContent = m; });
+}
+load();
+})();
+</script>
+</body>
+</html>
