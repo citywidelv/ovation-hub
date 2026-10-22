@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Ovation Review Queue | City Wide</title>
-<!-- build 2026-10-22b: phone pass. Under 600px the list hides while an item is open (Back to the list link), 44px rows, name box on its own row.
+<!-- build 2026-10-22c: co-brand. Ovation logo beside City Wide in the header and on the PDF band.
+     build 2026-10-22b: phone pass. Under 600px the list hides while an item is open (Back to the list link), 44px rows, name box on its own row.
      build 2026-10-22: FSM review queue for the Ovation Hub. Team passcode (CWAuth.require, Ops Hub gate).
      Lists porter checklists and Ovation reports (ov_list), opens one (ov_get), lets the FSM edit checks,
      notes and photos (ov_update), builds the PDF in the browser (jsPDF), stores it (ov_pdf_put) and
@@ -26,6 +27,7 @@ main.wrap{max-width:1180px;padding-bottom:40px}
 @media(max-width:600px){
   header.top .bar{flex-wrap:wrap}
   .who{width:100%;order:3;justify-content:space-between}
+  header.top .brands{display:none}
   .who input{flex:1;min-height:44px;font-size:16px}
   .tabs .chip{flex:1 1 40%;text-align:center;justify-content:center}
   .tabs a.chip{flex:1 1 100%;font-size:13px}
@@ -87,6 +89,7 @@ main.wrap{max-width:1180px;padding-bottom:40px}
 <header class="top">
 <div class="bar">
 <a class="back" href="https://citywidelv.github.io/cw-ops-desk/">&larr; Ops Hub</a>
+<div class="brands"><img class="cw" src="https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png" alt="City Wide Facility Solutions"><span class="div"></span><img class="ovl" src="ovation-logo.svg" alt="Ovation Property Management"></div>
 <div class="tag"><b>Ovation Review Queue</b>Porter checklists and client reports</div>
 <div class="who"><span>You:</span><input type="text" id="me" placeholder="Your name"></div>
 </div>
@@ -280,7 +283,11 @@ function save(){
 }
 
 /* ---------- PDF ---------- */
-var LOGO = null;
+var LOGO = null, OVLG = null;
+function ovlogo(){
+  if(OVLG) return Promise.resolve(OVLG);
+  return fetch("ovation-logo.png").then(function(r){ return r.blob(); }).then(function(b){ return new Promise(function(res){ var fr = new FileReader(); fr.onload = function(){ OVLG = fr.result; res(OVLG); }; fr.onerror = function(){ res(null); }; fr.readAsDataURL(b); }); }).catch(function(){ return null; });
+}
 function logo(){
   if(LOGO) return Promise.resolve(LOGO);
   return fetch(OV.LOGO).then(function(r){ return r.blob(); }).then(function(b){ return new Promise(function(res){ var fr = new FileReader(); fr.onload = function(){ LOGO = fr.result; res(LOGO); }; fr.onerror = function(){ res(null); }; fr.readAsDataURL(b); }); }).catch(function(){ return null; });
@@ -291,7 +298,7 @@ function buildPdf(open){
   var btn = $("bPdf"); btn.disabled = true; btn.textContent = "Building...";
   var needed = []; document.querySelectorAll("#detail .ph[data-pid]").forEach(function(el){ var pid = el.getAttribute("data-pid"); if(!S.photos[pid] && S.files[pid]) needed.push(pid); });
   return needed.reduce(function(c, pid){ return c.then(function(){ return api("ov_photo_get", { fileId:S.files[pid] }).then(function(r){ if(r.ok) S.photos[pid] = r.data; }).catch(function(){}); }); }, Promise.resolve())
-  .then(logo).then(function(lg){
+  .then(ovlogo).then(logo).then(function(lg){
     var sizes = {}; var pids = Object.keys(S.photos);
     return Promise.all(pids.map(function(pid){ return imgSize(S.photos[pid]).then(function(s){ sizes[pid] = s; }); })).then(function(){ return render(lg, sizes); });
   }).then(function(doc){
@@ -310,13 +317,16 @@ function buildPdf(open){
     var RED = [210, 39, 48], BLACK = [45, 42, 38], GREY = [99, 100, 102], LIGHT = [229, 229, 229];
     function header(){
       /* white band with the real logo (the official file is dark on light), red rule under it */
+      /* co-branded band: City Wide left, Ovation right, title row under both */
       if(lg){ try { pdf.addImage(lg, "PNG", M, 6.5, 57, 8); } catch(e){} }
+      if(OVLG){ try { pdf.addImage(OVLG, "PNG", W - M - 32, 6.1, 32, 8.8); } catch(e){} }
+      pdf.setDrawColor(228, 223, 214); pdf.setLineWidth(0.3); pdf.line(M, 18.5, W - M, 18.5);
       pdf.setTextColor(BLACK[0], BLACK[1], BLACK[2]); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5);
-      pdf.text(isCheck ? "Day Porter Daily Service Report" : (/request/i.test(d.mode) ? "Work Request" : "Service Report"), W - M, 11, { align:"right" });
+      pdf.text(isCheck ? "Day Porter Daily Service Report" : (/request/i.test(d.mode) ? "Work Request" : "Service Report"), M, 24.5);
       pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.setTextColor(GREY[0], GREY[1], GREY[2]);
-      pdf.text("Prepared for Ovation Property Management", W - M, 16.5, { align:"right" });
-      pdf.setFillColor(RED[0], RED[1], RED[2]); pdf.rect(M, 21, W - M * 2, 1.2, "F");
-      y = 30;
+      pdf.text("Prepared for Ovation Property Management by City Wide Facility Solutions", W - M, 24.5, { align:"right" });
+      pdf.setFillColor(RED[0], RED[1], RED[2]); pdf.rect(M, 27, W - M * 2, 1.2, "F");
+      y = 35;
     }
     function footer(){
       pdf.setDrawColor(LIGHT[0], LIGHT[1], LIGHT[2]); pdf.line(M, 265, W - M, 265);
