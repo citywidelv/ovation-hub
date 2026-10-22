@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Ovation Review Queue | City Wide</title>
+<!-- build 2026-10-22: FSM review queue for the Ovation Hub. Team passcode (CWAuth.require, Ops Hub gate).
+     Lists porter checklists and Ovation reports (ov_list), opens one (ov_get), lets the FSM edit checks,
+     notes and photos (ov_update), builds the PDF in the browser (jsPDF), stores it (ov_pdf_put) and
+     emails it to the property (ov_send). Recipients per property live on the Properties tab of the
+     CW Ovation Hub book (ov_properties / ov_property_set). -->
+<link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
+<link rel="stylesheet" href="ov.css">
+<style>
+body{background:var(--light)}
+main.wrap{max-width:1180px;padding-bottom:40px}
+.tabs{display:flex;gap:6px;margin:6px 0 12px;flex-wrap:wrap}
+.tabs .chip{border-radius:10px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.filters select{width:auto;min-width:160px;min-height:40px;padding:8px 36px 8px 10px;font-size:14px}
+.filters .btn{width:auto}
+.layout{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.list{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.item{display:block;width:100%;text-align:left;background:var(--white);border:0;border-bottom:1px solid var(--light);padding:12px 14px;cursor:pointer;font-family:inherit;color:var(--black)}
+.item:hover{background:#faf7f5}
+.item.on{background:#fdf3f3;border-left:4px solid var(--red)}
+.item b{display:block;font-size:14px}
+.item .m{font-size:12px;color:var(--grey);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.empty{padding:24px;text-align:center;color:var(--grey);font-size:13px}
+.detail .head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-bottom:10px}
+.detail h2{font-size:1.2rem;margin:0}
+.detail .meta{font-size:13px;color:var(--grey)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.actions .btn{width:auto;min-height:42px;padding:10px 14px;font-size:14px}
+.rarea{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:var(--white)}
+.rarea .rh{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--light)}
+.rarea .rh b{flex:1;font-size:14px}
+.rarea .rh .st{font-size:12px;color:var(--grey)}
+.rarea .rb{display:grid;grid-template-columns:1fr 220px;gap:10px;padding:10px 12px}
+@media(max-width:700px){.rarea .rb{grid-template-columns:1fr}}
+.rarea.na .rb{display:none}
+.rarea .check{padding:6px 2px;min-height:34px;font-size:13px}
+.rarea .check input{width:18px;height:18px}
+.rarea .grp{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--grey);margin:8px 0 2px}
+.rarea .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.rarea .ph{position:relative;aspect-ratio:1;background:var(--light);border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:zoom-in}
+.rarea .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.rarea .ph .rm{position:absolute;top:3px;right:3px;background:rgba(45,42,38,.85);color:#fff;border:0;border-radius:50%;width:24px;height:24px;font-size:14px;cursor:pointer}
+.rarea .ph .ld{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--grey)}
+.rarea input[type=text]{min-height:38px;font-size:14px;padding:8px 10px}
+.qa{display:grid;grid-template-columns:200px 1fr;gap:6px 14px;font-size:14px}
+.qa dt{color:var(--grey);font-size:13px}
+.qa dd{font-weight:700}
+@media(max-width:600px){.qa{grid-template-columns:1fr}}
+.modal{position:fixed;inset:0;background:rgba(45,42,38,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal .box{background:var(--white);border-radius:12px;max-width:560px;width:100%;padding:20px;max-height:92vh;overflow:auto}
+.modal h3{font-size:1.05rem;margin-bottom:10px}
+.light{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:60;cursor:zoom-out}
+.light img{max-width:96vw;max-height:94vh;border-radius:6px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--black);color:#fff;font-size:13px;font-weight:700;padding:10px 16px;border-radius:999px;z-index:70;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--grey)}
+.who input{width:170px;min-height:36px;padding:6px 10px;font-size:14px}
+</style>
+<link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
+</head>
+<body>
+<header class="top">
+<div class="bar">
+<a class="back" href="https://citywidelv.github.io/cw-ops-desk/">&larr; Ops Hub</a>
+<div class="tag"><b>Ovation Review Queue</b>Porter checklists and client reports</div>
+<div class="who"><span>You:</span><input type="text" id="me" placeholder="Your name"></div>
+</div>
+</header>
+
+<main class="wrap">
+<div class="tabs" id="tabs">
+<button type="button" class="chip on" data-t="checklist">Porter Checklists</button>
+<button type="button" class="chip" data-t="report">Reports &amp; Requests</button>
+<a class="chip" href="index.html" style="margin-left:auto;text-decoration:none">Ovation Hub (client side) &rarr;</a>
+</div>
+<div class="filters">
+<select id="fstatus"><option value="New">New</option><option value="Reviewed">Reviewed</option><option value="Sent">Sent</option><option value="">All</option></select>
+<select id="fprop"><option value="">All properties</option></select>
+<button type="button" class="btn ghost sm" id="refresh">Refresh</button>
+<span id="count" style="font-size:12px;color:var(--grey)"></span>
+<a id="bookLink" href="#" target="_blank" rel="noopener" style="font-size:12px;margin-left:auto;display:none">Open the CW Ovation Hub book</a>
+</div>
+
+<div class="layout">
+<div class="list" id="list"><div class="empty">Loading...</div></div>
+<div class="detail" id="detail"><div class="card plain"><div class="empty">Pick an item on the left.</div></div></div>
+</div>
+</main>
+
+<div id="overlay"></div>
+
+<script src="https://citywidelv.github.io/cw-ops-desk/cw-auth.js"></script>
+<script src="https://citywidelv.github.io/cw-ops-desk/jspdf.umd.min-2.5.1.js"></script>
+<script src="ov-shared.js"></script>
+<script>
+(function(){
+var $ = OV.$, esc = OV.esc;
+var PASS = CWAuth.require({ hub:"ops" });
+if(!PASS) return;
+var api = function(kind, body){ body = body || {}; body.passcode = PASS; return OV.api(kind, body).then(function(r){ if(r && r.ok === false && /passcode/i.test(String(r.error || ""))) { CWAuth.locked("ops", r.error); throw new Error(r.error); } return r; }); };
+var P = OV.params();
+var S = { type: P.t === "report" ? "report" : "checklist", rows:[], cur:null, doc:null, index:null, files:{}, photos:{}, props:[], pdf:null, dirty:false };
+
+$("me").value = (function(){ try { return localStorage.getItem("cwOpsName") || ""; } catch(e){ return ""; } })();
+$("me").addEventListener("change", function(){ try { localStorage.setItem("cwOpsName", $("me").value); } catch(e){} });
+$("fprop").innerHTML = '<option value="">All properties</option>' + OV.PROPERTIES.map(function(p){ return '<option>' + esc(p.name) + '</option>'; }).join("");
+
+function toast(m, bad){ var t = document.createElement("div"); t.className = "toast"; if(bad) t.style.background = "#D22730"; t.textContent = m; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 2600); }
+function pill(st){ var k = String(st || "New").toLowerCase(); return '<span class="pill ' + k + '">' + esc(st || "New") + '</span>'; }
+
+/* ---------- list ---------- */
+function load(){
+  $("list").innerHTML = '<div class="empty">Loading...</div>';
+  var cacheKey = "cwOvQueue_" + S.type;
+  try { var c = JSON.parse(localStorage.getItem(cacheKey) || "null"); if(c && c.length){ S.rows = c; paintList(); } } catch(e){}
+  api("ov_list", { type:S.type, status:$("fstatus").value, property:$("fprop").value }).then(function(r){
+    if(!r.ok) throw new Error(r.error);
+    S.rows = r.rows || [];
+    try { localStorage.setItem(cacheKey, JSON.stringify(S.rows.slice(0, 60))); } catch(e){}
+    if(r.url){ $("bookLink").href = r.url; $("bookLink").style.display = ""; }
+    paintList();
+    if(P.id && !S.cur){ var hit = S.rows.filter(function(x){ return x.id === P.id; })[0]; openItem(P.id, hit); P.id = ""; }
+  }).catch(function(e){ $("list").innerHTML = '<div class="empty">' + esc(e.message || e) + '</div>'; });
+}
+function paintList(){
+  var rows = S.rows;
+  $("count").textContent = rows.length + " item" + (rows.length === 1 ? "" : "s");
+  if(!rows.length){ $("list").innerHTML = '<div class="empty">Nothing here. Change the status filter to see more.</div>'; return; }
+  $("list").innerHTML = rows.map(function(r){
+    var m = S.type === "checklist"
+      ? [esc(r.weekday) + " " + esc(r.service_date), esc(r.porter), r.areas_done + " areas", r.photos + " photos"]
+      : [OV.fmtDate(r.created_at), esc(r.mode) + (r.category ? " · " + esc(r.category) : ""), esc(r.submitter), r.urgency ? "<b>" + esc(r.urgency) + "</b>" : ""];
+    return '<button type="button" class="item' + (S.cur === r.id ? ' on' : '') + '" data-id="' + esc(r.id) + '"><b>' + esc(r.property) + '</b><div class="m">' + pill(r.status) + m.filter(Boolean).map(function(x){ return '<span>' + x + '</span>'; }).join("") + '</div>' + (S.type === "report" && r.summary ? '<div class="m" style="color:var(--black)">' + esc(String(r.summary).slice(0, 110)) + '</div>' : '') + '</button>';
+  }).join("");
+  $("list").querySelectorAll(".item").forEach(function(b){ b.addEventListener("click", function(){ openItem(b.getAttribute("data-id"), S.rows.filter(function(x){ return x.id === b.getAttribute("data-id"); })[0]); }); });
+}
+$("tabs").querySelectorAll(".chip[data-t]").forEach(function(b){ b.addEventListener("click", function(){ S.type = b.getAttribute("data-t"); $("tabs").querySelectorAll(".chip[data-t]").forEach(function(x){ x.classList.toggle("on", x === b); }); S.cur = null; $("detail").innerHTML = '<div class="card plain"><div class="empty">Pick an item on the left.</div></div>'; load(); }); });
+$("fstatus").addEventListener("change", load); $("fprop").addEventListener("change", load); $("refresh").addEventListener("click", load);
+if(S.type === "report") $("tabs").querySelectorAll(".chip[data-t]").forEach(function(x){ x.classList.toggle("on", x.getAttribute("data-t") === "report"); });
+if(P.id) $("fstatus").value = "";
+
+/* ---------- properties (recipients) ---------- */
+function loadProps(){ return S.props.length ? Promise.resolve(S.props) : api("ov_properties").then(function(r){ S.props = (r.properties || []); return S.props; }).catch(function(){ return []; }); }
+function propRec(name){ return S.props.filter(function(p){ return String(p.property).toLowerCase() === String(name).toLowerCase(); })[0] || null; }
+
+/* ---------- detail ---------- */
+function openItem(id, row){
+  if(S.dirty && !confirm("You have unsaved edits. Leave without saving?")) return;
+  S.cur = id; S.dirty = false; S.pdf = null; S.photos = {};
+  paintList();
+  $("detail").innerHTML = '<div class="card plain"><div class="empty">Loading ' + esc(row ? row.property : id) + '...</div></div>';
+  api("ov_get", { id:id }).then(function(r){
+    if(!r.ok) throw new Error(r.error);
+    S.doc = r.doc; S.index = r.index; S.files = r.photo_files || {}; S.pdfUrl = r.pdf_url || "";
+    S.doc.fsm_notes = S.doc.fsm_notes || "";
+    paintDetail();
+    loadProps().then(function(){});
+  }).catch(function(e){ $("detail").innerHTML = '<div class="card plain"><div class="empty">' + esc(e.message || e) + '</div></div>'; });
+}
+function status(){ return S.doc.status || S.index.status || "New"; }
+function paintDetail(){
+  var d = S.doc, isCheck = S.type === "checklist";
+  var h = '<div class="card plain detail">';
+  h += '<div class="head"><div><h2>' + esc(d.property) + '</h2><div class="meta">' + (isCheck
+      ? esc(d.weekday) + ", " + esc(d.service_date) + " · Porter: <b>" + esc(d.porter) + "</b>" + (d.shift_start ? " · " + esc(d.shift_start) + (d.shift_end ? " to " + esc(d.shift_end) : "") : "") + " · submitted " + esc(OV.fmtDate(d.submitted_at || d.created_at))
+      : esc(d.mode) + " · " + esc(d.category) + (d.subcategory ? " · " + esc(d.subcategory) : "") + " · from <b>" + esc(d.submitter) + "</b> (" + esc(d.role) + ") · " + esc(OV.fmtDate(d.created_at))) +
+    '</div></div><div>' + pill(status()) + (S.index.sent_to ? '<div class="meta" style="margin-top:4px">Sent ' + esc(OV.fmtDate(S.index.sent_at)) + ' to ' + esc(S.index.sent_to) + '</div>' : '') + '</div></div>';
+  h += '<div class="actions"><button type="button" class="btn ghost" id="bSave">Save edits</button><button type="button" class="btn dark" id="bPdf">Build PDF</button><button type="button" class="btn" id="bSend">Send to property</button>' +
+    (status() === "New" ? '<button type="button" class="btn ghost" id="bRev">Mark reviewed</button>' : '') +
+    (S.pdfUrl ? '<a class="btn ghost" href="' + esc(S.pdfUrl) + '" target="_blank" rel="noopener">Last PDF</a>' : '') + '</div>';
+  h += '<div class="field"><label>City Wide notes <span class="hint" style="display:inline">(printed on the PDF)</span></label><textarea id="fsmNotes" placeholder="Anything the property should know from City Wide. Leave blank to print nothing.">' + esc(d.fsm_notes || "") + '</textarea></div>';
+  h += '</div>';
+  if(isCheck){
+    h += '<div class="card plain"><h2 style="font-size:1rem">Passes</h2>' + (d.passes || []).map(function(p, i){ return '<label class="check" style="min-height:36px;padding:6px 2px;font-size:13px"><input type="checkbox" data-pass="' + i + '"' + (p.done ? ' checked' : '') + '><span>' + esc(p.t) + '</span></label>'; }).join("") + '</div>';
+    (d.areas || []).forEach(function(a, ai){
+      var daily = a.tasks.filter(function(t){ return t.f === "daily"; }), done = daily.filter(function(t){ return t.done; }).length;
+      h += '<div class="rarea' + (a.na ? ' na' : '') + '" data-ai="' + ai + '"><div class="rh"><b>' + esc(a.name) + '</b><span class="st">' + (a.na ? "Not serviced today" : done + "/" + daily.length + " · " + a.photos.length + " photo" + (a.photos.length === 1 ? "" : "s")) + '</span><button type="button" class="chip" style="min-height:32px;padding:5px 10px;font-size:12px" data-na="' + ai + '">' + (a.na ? "Include" : "Leave off PDF") + '</button></div>';
+      h += '<div class="rb"><div>';
+      ["daily","weekly","monthly"].forEach(function(f){
+        var list = a.tasks.map(function(t, i){ return { t:t, i:i }; }).filter(function(x){ return x.t.f === f; });
+        if(!list.length) return;
+        if(f !== "daily" && !list.some(function(x){ return x.t.done; })) return;   /* unticked weekly/monthly rows stay out of the way */
+        h += '<div class="grp">' + (f === "daily" ? "Each shift" : f === "weekly" ? "Weekly tasks done today" : "Monthly tasks done today") + '</div>';
+        list.forEach(function(x){ if(f !== "daily" && !x.t.done) return; h += '<label class="check' + (x.t.done ? ' done' : '') + '"><input type="checkbox" data-task="' + ai + ':' + x.i + '"' + (x.t.done ? ' checked' : '') + '><span>' + esc(x.t.t) + '</span></label>'; });
+      });
+      if(a.floors) h += '<div class="meta" style="font-size:13px;margin-top:6px">Floors: <b>' + esc(a.floors) + '</b></div>';
+      h += '<div class="field" style="margin:10px 0 0"><input type="text" data-note="' + ai + '" value="' + esc(a.note || "") + '" placeholder="Porter note for this area"></div>';
+      h += '</div><div><div class="pgrid">' + a.photos.map(function(p, pi){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div><button type="button" class="rm" data-rm="' + ai + ':' + pi + '" aria-label="Remove photo">&times;</button></div>'; }).join("") + '</div></div></div></div>';
+    });
+    h += '<div class="card plain"><h2 style="font-size:1rem">Things to report to the property</h2>' + ((d.followup_tags || []).length ? '<div class="chips" style="margin-bottom:8px">' + d.followup_tags.map(function(t){ return '<span class="chip on red" style="min-height:30px;padding:4px 10px;font-size:12px">' + esc(t) + '</span>'; }).join("") + '</div>' : '') +
+      '<textarea id="fu">' + esc(d.followups || "") + '</textarea>' +
+      ((d.photos || []).length ? '<div class="rarea" style="margin-top:10px;border:0"><div class="pgrid" style="grid-template-columns:repeat(4,1fr)">' + d.photos.map(function(p, pi){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div><button type="button" class="rm" data-rmfu="' + pi + '">&times;</button></div>'; }).join("") + '</div></div>' : '') +
+      '<h2 style="font-size:1rem;margin-top:14px">Supplies running low</h2><textarea id="sup">' + esc(d.supplies || "") + '</textarea></div>';
+  } else {
+    h += '<div class="card plain"><dl class="qa">';
+    [["Property", d.property], ["From", d.submitter + (d.role ? " (" + d.role + ")" : "")], ["Phone", d.phone], ["Email", d.email], ["Type", d.mode], ["Category", d.category], ["Where", d.location], ["Urgency", d.urgency]].forEach(function(f){ if(f[1]) h += '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>'; });
+    (d.answers || []).forEach(function(a){ var v = Array.isArray(a.a) ? a.a.join(", ") : a.a; if(v) h += '<dt>' + esc(a.q) + '</dt><dd>' + esc(v) + '</dd>'; });
+    if(d.notes) h += '<dt>Anything else</dt><dd>' + esc(d.notes) + '</dd>';
+    h += '</dl>';
+    if((d.hazard_notes || []).length) h += '<div class="note warn" style="margin-top:12px"><b>Guidance shown to the submitter:</b><br>' + d.hazard_notes.map(esc).join("<br>") + '</div>';
+    if((d.photos || []).length) h += '<div class="rarea" style="margin-top:12px;border:0"><div class="pgrid" style="grid-template-columns:repeat(4,1fr)">' + d.photos.map(function(p, pi){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div><button type="button" class="rm" data-rmfu="' + pi + '">&times;</button></div>'; }).join("") + '</div></div>';
+    h += '<div class="field" style="margin-top:14px"><label>City Wide response <span class="hint" style="display:inline">(printed on the PDF under the request)</span></label><textarea id="resp" placeholder="What City Wide did or will do. Example: Porter addressed the spill at 2:15 PM. Carpet extraction quoted at $385, scheduled Nov 4.">' + esc(d.response || "") + '</textarea></div>';
+    h += '</div>';
+  }
+  $("detail").innerHTML = h;
+  wireDetail();
+  loadPhotos();
+}
+function mark(){ S.dirty = true; }
+function wireDetail(){
+  var d = S.doc, host = $("detail");
+  $("fsmNotes").addEventListener("input", function(){ d.fsm_notes = $("fsmNotes").value; mark(); });
+  host.querySelectorAll("[data-pass]").forEach(function(c){ c.addEventListener("change", function(){ d.passes[Number(c.getAttribute("data-pass"))].done = c.checked; mark(); }); });
+  host.querySelectorAll("[data-task]").forEach(function(c){ c.addEventListener("change", function(){ var p = c.getAttribute("data-task").split(":"); d.areas[Number(p[0])].tasks[Number(p[1])].done = c.checked; c.closest(".check").classList.toggle("done", c.checked); mark(); }); });
+  host.querySelectorAll("[data-note]").forEach(function(i){ i.addEventListener("input", function(){ d.areas[Number(i.getAttribute("data-note"))].note = i.value; mark(); }); });
+  host.querySelectorAll("[data-na]").forEach(function(b){ b.addEventListener("click", function(){ var a = d.areas[Number(b.getAttribute("data-na"))]; a.na = !a.na; mark(); paintDetail(); }); });
+  host.querySelectorAll("[data-rm]").forEach(function(b){ b.addEventListener("click", function(){ if(!confirm("Remove this photo from the report? It is deleted when you save.")) return; var p = b.getAttribute("data-rm").split(":"); var ph = d.areas[Number(p[0])].photos.splice(Number(p[1]), 1)[0]; (S.drop = S.drop || []).push(ph.pid); mark(); paintDetail(); }); });
+  host.querySelectorAll("[data-rmfu]").forEach(function(b){ b.addEventListener("click", function(){ if(!confirm("Remove this photo? It is deleted when you save.")) return; var ph = d.photos.splice(Number(b.getAttribute("data-rmfu")), 1)[0]; (S.drop = S.drop || []).push(ph.pid); mark(); paintDetail(); }); });
+  var fu = $("fu"); if(fu) fu.addEventListener("input", function(){ d.followups = fu.value; mark(); });
+  var sup = $("sup"); if(sup) sup.addEventListener("input", function(){ d.supplies = sup.value; mark(); });
+  var resp = $("resp"); if(resp) resp.addEventListener("input", function(){ d.response = resp.value; mark(); });
+  $("bSave").addEventListener("click", function(){ save().then(function(){ toast("Saved"); }); });
+  $("bPdf").addEventListener("click", function(){ buildPdf(true); });
+  $("bSend").addEventListener("click", sendDialog);
+  var rev = $("bRev"); if(rev) rev.addEventListener("click", function(){ d.status = "Reviewed"; save().then(function(){ toast("Marked reviewed"); load(); }); });
+  host.querySelectorAll(".ph").forEach(function(el){ el.addEventListener("click", function(e){ if(e.target.closest(".rm")) return; var pid = el.getAttribute("data-pid"); if(S.photos[pid]) lightbox(S.photos[pid]); }); });
+}
+function lightbox(src){ var l = document.createElement("div"); l.className = "light"; l.innerHTML = '<img src="' + src + '" alt="">'; l.addEventListener("click", function(){ l.remove(); }); document.body.appendChild(l); }
+
+/* Photos load one at a time after the detail paints, so the page is usable at once. */
+function loadPhotos(){
+  var pids = []; document.querySelectorAll("#detail .ph[data-pid]").forEach(function(el){ pids.push(el.getAttribute("data-pid")); });
+  pids.reduce(function(chain, pid){ return chain.then(function(){
+    if(S.photos[pid]) return place(pid);
+    var fid = S.files[pid]; if(!fid){ place(pid, true); return; }
+    return api("ov_photo_get", { fileId:fid }).then(function(r){ if(r.ok){ S.photos[pid] = r.data; } place(pid, !r.ok); }).catch(function(){ place(pid, true); });
+  }); }, Promise.resolve());
+}
+function place(pid, missing){
+  document.querySelectorAll('#detail .ph[data-pid="' + pid + '"]').forEach(function(el){
+    var ld = el.querySelector(".ld");
+    if(missing){ if(ld) ld.textContent = "not uploaded"; return; }
+    if(ld) ld.remove();
+    if(!el.querySelector("img")){ var img = document.createElement("img"); img.src = S.photos[pid]; el.insertBefore(img, el.firstChild); }
+  });
+}
+function save(){
+  var d = S.doc;
+  var body = { doc:d, drop_photos: S.drop || [], reviewed_by: $("me").value };
+  if(d.status === "New" && (d.fsm_notes || d.response || (S.drop && S.drop.length))) d.status = "Reviewed";
+  return api("ov_update", body).then(function(r){ if(!r.ok) throw new Error(r.error); S.dirty = false; S.drop = []; S.index.status = d.status; return r; }).catch(function(e){ toast(e.message || String(e), true); throw e; });
+}
+
+/* ---------- PDF ---------- */
+var LOGO = null;
+function logo(){
+  if(LOGO) return Promise.resolve(LOGO);
+  return fetch(OV.LOGO).then(function(r){ return r.blob(); }).then(function(b){ return new Promise(function(res){ var fr = new FileReader(); fr.onload = function(){ LOGO = fr.result; res(LOGO); }; fr.onerror = function(){ res(null); }; fr.readAsDataURL(b); }); }).catch(function(){ return null; });
+}
+function imgSize(data){ return new Promise(function(res){ var i = new Image(); i.onload = function(){ res({ w:i.width, h:i.height }); }; i.onerror = function(){ res({ w:4, h:3 }); }; i.src = data; }); }
+function buildPdf(open){
+  var d = S.doc, isCheck = S.type === "checklist";
+  var btn = $("bPdf"); btn.disabled = true; btn.textContent = "Building...";
+  var needed = []; document.querySelectorAll("#detail .ph[data-pid]").forEach(function(el){ var pid = el.getAttribute("data-pid"); if(!S.photos[pid] && S.files[pid]) needed.push(pid); });
+  return needed.reduce(function(c, pid){ return c.then(function(){ return api("ov_photo_get", { fileId:S.files[pid] }).then(function(r){ if(r.ok) S.photos[pid] = r.data; }).catch(function(){}); }); }, Promise.resolve())
+  .then(logo).then(function(lg){
+    var sizes = {}; var pids = Object.keys(S.photos);
+    return Promise.all(pids.map(function(pid){ return imgSize(S.photos[pid]).then(function(s){ sizes[pid] = s; }); })).then(function(){ return render(lg, sizes); });
+  }).then(function(doc){
+    var blob = doc.output("blob");
+    S.pdf = doc.output("datauristring");
+    S.pdfName = (isCheck ? "Porter Report - " : "City Wide Report - ") + d.property + " - " + (isCheck ? d.service_date : String(d.created_at || "").slice(0, 10)) + ".pdf";
+    if(open){ var url = URL.createObjectURL(blob); window.open(url, "_blank"); }
+    btn.disabled = false; btn.textContent = "Build PDF";
+    return S.pdf;
+  }).catch(function(e){ btn.disabled = false; btn.textContent = "Build PDF"; toast("PDF failed: " + (e.message || e), true); throw e; });
+
+  function render(lg, sizes){
+    var jsPDF = window.jspdf.jsPDF;
+    var pdf = new jsPDF({ unit:"mm", format:"letter" });
+    var W = 215.9, M = 14, y = 0, page = 1;
+    var RED = [210, 39, 48], BLACK = [45, 42, 38], GREY = [99, 100, 102], LIGHT = [229, 229, 229];
+    function header(){
+      /* white band with the real logo (the official file is dark on light), red rule under it */
+      if(lg){ try { pdf.addImage(lg, "PNG", M, 6.5, 57, 8); } catch(e){} }
+      pdf.setTextColor(BLACK[0], BLACK[1], BLACK[2]); pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5);
+      pdf.text(isCheck ? "Day Porter Daily Service Report" : (/request/i.test(d.mode) ? "Work Request" : "Service Report"), W - M, 11, { align:"right" });
+      pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.setTextColor(GREY[0], GREY[1], GREY[2]);
+      pdf.text("Prepared for Ovation Property Management", W - M, 16.5, { align:"right" });
+      pdf.setFillColor(RED[0], RED[1], RED[2]); pdf.rect(M, 21, W - M * 2, 1.2, "F");
+      y = 30;
+    }
+    function footer(){
+      pdf.setDrawColor(LIGHT[0], LIGHT[1], LIGHT[2]); pdf.line(M, 265, W - M, 265);
+      pdf.setFontSize(8); pdf.setTextColor(GREY[0], GREY[1], GREY[2]); pdf.setFont("helvetica", "normal");
+      pdf.text("City Wide Facility Solutions | 3215 W Charleston Blvd, Suite 130, Las Vegas, NV 89102 | 702-483-1874 | LasVegas.GoCityWide.com", M, 270);
+      pdf.text("Page " + page, W - M, 270, { align:"right" });
+    }
+    function need(h){ if(y + h > 260){ footer(); pdf.addPage(); page++; header(); } }
+    function h1(t){ need(12); pdf.setFont("helvetica", "bold"); pdf.setFontSize(15); pdf.setTextColor(BLACK[0], BLACK[1], BLACK[2]); pdf.text(t, M, y); y += 7; }
+    function meta(pairs){
+      pdf.setFontSize(9.5);
+      pairs.forEach(function(p){ if(!p[1]) return; need(5.5); pdf.setFont("helvetica", "normal"); pdf.setTextColor(GREY[0], GREY[1], GREY[2]); pdf.text(p[0], M, y); pdf.setFont("helvetica", "bold"); pdf.setTextColor(BLACK[0], BLACK[1], BLACK[2]); var lines = pdf.splitTextToSize(String(p[1]), W - M * 2 - 42); pdf.text(lines, M + 42, y); y += 5 * lines.length + 0.5; });
+      y += 3;
+    }
+    function section(t, sub){
+      need(14); y += 2;
+      pdf.setFillColor(RED[0], RED[1], RED[2]); pdf.rect(M, y - 4, 1.4, 6, "F");
+      pdf.setFont("helvetica", "bold"); pdf.setFontSize(11.5); pdf.setTextColor(BLACK[0], BLACK[1], BLACK[2]); pdf.text(t, M + 4, y);
+      if(sub){ pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.setTextColor(GREY[0], GREY[1], GREY[2]); pdf.text(sub, W - M, y, { align:"right" }); }
+      y += 6;
+    }
+    function para(t, size, color){
+      if(!t) return; pdf.setFont("helvetica", "normal"); pdf.setFontSize(size || 9.5); var c = color || BLACK; pdf.setTextColor(c[0], c[1], c[2]);
+      var lines = pdf.splitTextToSize(String(t), W - M * 2); lines.forEach(function(l){ need(5); pdf.text(l, M, y); y += 4.6; }); y += 1.5;
+    }
+    function box(x, yy, done){ pdf.setDrawColor(GREY[0], GREY[1], GREY[2]); pdf.setLineWidth(0.3); if(done){ pdf.setFillColor(RED[0], RED[1], RED[2]); pdf.rect(x, yy - 2.9, 3.2, 3.2, "FD"); pdf.setDrawColor(255, 255, 255); pdf.setLineWidth(0.5); pdf.line(x + 0.7, yy - 1.3, x + 1.4, yy - 0.5); pdf.line(x + 1.4, yy - 0.5, x + 2.7, yy - 2.3); } else { pdf.rect(x, yy - 2.9, 3.2, 3.2, "D"); } }
+    function photoBlock(pids, x, maxW, startY){
+      var yy = startY, placed = 0;
+      pids.forEach(function(pid){ var data = S.photos[pid]; if(!data) return; var s = sizes[pid] || { w:4, h:3 }; var w = maxW, h = w * s.h / s.w; if(h > 48){ h = 48; w = h * s.w / s.h; } try { pdf.addImage(data, "JPEG", x, yy, w, h); placed++; yy += h + 2; } catch(e){} });
+      return yy;
+    }
+
+    header();
+    if(isCheck){
+      h1(d.property);
+      var p = OV.byName(d.property);
+      var passesDone = (d.passes || []).filter(function(x){ return x.done; }).map(function(x){ return x.t.replace(/\s*\(.*\)$/, ""); });
+      var areasIn = (d.areas || []).filter(function(a){ return !a.na; });
+      var tasksDone = 0, tasksAll = 0; areasIn.forEach(function(a){ a.tasks.forEach(function(t){ if(t.f === "daily"){ tasksAll++; if(t.done) tasksDone++; } }); });
+      meta([["Date", d.weekday + ", " + d.service_date], ["Address", p ? p.address : ""], ["Porter", d.porter], ["Shift", d.shift_start ? d.shift_start + (d.shift_end ? " to " + d.shift_end : "") : ""], ["Areas serviced", areasIn.length + " of " + (d.areas || []).length], ["Daily tasks", tasksDone + " of " + tasksAll + " completed"], ["Passes", passesDone.join(", ")]]);
+      if(d.fsm_notes){ section("Note from City Wide"); para(d.fsm_notes); }
+      areasIn.forEach(function(a){
+        var daily = a.tasks.filter(function(t){ return t.f === "daily"; }), extra = a.tasks.filter(function(t){ return t.f !== "daily" && t.done; });
+        var pids = a.photos.map(function(x){ return x.pid; }).filter(function(pid){ return S.photos[pid]; });
+        var rowsH = (daily.length + extra.length + (extra.length ? 1 : 0)) * 4.6 + (a.note ? 10 : 0) + (a.floors ? 5 : 0) + 4;
+        var photoH = 0; pids.forEach(function(pid){ var s = sizes[pid] || { w:4, h:3 }; var h = 58 * s.h / s.w; if(h > 48) h = 48; photoH += h + 2; });
+        need(Math.min(Math.max(rowsH, photoH) + 10, 120));
+        section(a.name, daily.filter(function(t){ return t.done; }).length + " of " + daily.length + " daily tasks");
+        var top = y, colW = pids.length ? W - M * 2 - 64 : W - M * 2;
+        pdf.setFontSize(9); daily.forEach(function(t){ need(5); box(M, y, t.done); pdf.setFont("helvetica", "normal"); pdf.setTextColor(t.done ? BLACK[0] : GREY[0], t.done ? BLACK[1] : GREY[1], t.done ? BLACK[2] : GREY[2]); var lines = pdf.splitTextToSize(t.t + (t.done ? "" : "  (not completed)"), colW - 6); pdf.text(lines, M + 5, y); y += 4.6 * lines.length; });
+        if(extra.length){ y += 1; pdf.setFont("helvetica", "bold"); pdf.setFontSize(8); pdf.setTextColor(GREY[0], GREY[1], GREY[2]); pdf.text("ALSO DONE TODAY", M, y); y += 4; pdf.setFontSize(9); extra.forEach(function(t){ need(5); box(M, y, true); pdf.setFont("helvetica", "normal"); pdf.setTextColor(BLACK[0], BLACK[1], BLACK[2]); var lines = pdf.splitTextToSize(t.t + (t.f === "weekly" ? "  (weekly)" : "  (monthly)"), colW - 6); pdf.text(lines, M + 5, y); y += 4.6 * lines.length; }); }
+        if(a.floors){ need(5); pdf.setFont("helvetica", "normal"); pdf.setFontSize(9); pdf.setTextColor(BLACK[0], BLACK[1], BLACK[2]); pdf.text("Floors: " + a.floors, M, y); y += 4.6; }
+        if(a.note){ need(6); pdf.setFont("helvetica", "italic"); pdf.setFontSize(9); pdf.setTextColor(GREY[0], GREY[1], GREY[2]); var nl = pdf.splitTextToSize("Note: " + a.note, colW); pdf.text(nl, M, y); y += 4.6 * nl.length; }
+        if(pids.length){ var endY = photoBlock(pids, W - M - 58, 58, top); if(endY > y) y = endY; }
+        y += 3;
+      });
+      var left = (d.areas || []).filter(function(a){ return a.na; });
+      if(left.length){ section("Not serviced today"); para(left.map(function(a){ return a.name; }).join(", "), 9, GREY); }
+      if(d.followups || (d.followup_tags || []).length || (d.photos || []).length){
+        section("Reported to the property");
+        if((d.followup_tags || []).length) para(d.followup_tags.join(" · "), 9.5);
+        para(d.followups);
+        var fpids = (d.photos || []).map(function(x){ return x.pid; }).filter(function(pid){ return S.photos[pid]; });
+        if(fpids.length){ need(50); var x = M; fpids.forEach(function(pid){ var s = sizes[pid] || { w:4, h:3 }; var h = 44, w = h * s.w / s.h; if(w > 60){ w = 60; h = w * s.h / s.w; } if(x + w > W - M){ x = M; y += 46; need(50); } try { pdf.addImage(S.photos[pid], "JPEG", x, y, w, h); } catch(e){} x += w + 3; }); y += 48; }
+      }
+      if(d.supplies){ section("Supplies running low"); para(d.supplies); }
+    } else {
+      h1(d.property);
+      var p2 = OV.byName(d.property);
+      meta([["Submitted", OV.fmtDate(d.created_at)], ["Address", p2 ? p2.address : ""], ["From", d.submitter + (d.role ? ", " + d.role : "")], ["Contact", [d.phone, d.email].filter(Boolean).join("  ·  ")], ["Type", d.mode + (d.category ? ": " + d.category : "")], ["Where", d.location], ["Urgency", d.urgency]]);
+      section("Details");
+      (d.answers || []).forEach(function(a){ var v = Array.isArray(a.a) ? a.a.join(", ") : a.a; if(!v) return; need(10); pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.setTextColor(GREY[0], GREY[1], GREY[2]); pdf.text(a.q, M, y); y += 4; pdf.setFont("helvetica", "bold"); pdf.setFontSize(9.5); pdf.setTextColor(BLACK[0], BLACK[1], BLACK[2]); var lines = pdf.splitTextToSize(String(v), W - M * 2); pdf.text(lines, M, y); y += 4.6 * lines.length + 2; });
+      if(d.notes){ pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.setTextColor(GREY[0], GREY[1], GREY[2]); need(5); pdf.text("Anything else", M, y); y += 4; para(d.notes); }
+      var rp = (d.photos || []).map(function(x){ return x.pid; }).filter(function(pid){ return S.photos[pid]; });
+      if(rp.length){ section("Photos"); need(50); var x2 = M; rp.forEach(function(pid){ var s = sizes[pid] || { w:4, h:3 }; var h = 46, w = h * s.w / s.h; if(w > 62){ w = 62; h = w * s.h / s.w; } if(x2 + w > W - M){ x2 = M; y += 48; need(50); } try { pdf.addImage(S.photos[pid], "JPEG", x2, y, w, h); } catch(e){} x2 += w + 3; }); y += 50; }
+      if(d.response){ section("City Wide response"); para(d.response); }
+      if(d.fsm_notes){ section("Note from City Wide"); para(d.fsm_notes); }
+    }
+    y += 4; need(10);
+    pdf.setFont("helvetica", "normal"); pdf.setFontSize(8.5); pdf.setTextColor(GREY[0], GREY[1], GREY[2]);
+    pdf.text("Reviewed by " + ($("me").value || "City Wide Facility Solutions") + " on " + new Date().toLocaleDateString("en-US", { month:"long", day:"numeric", year:"numeric" }) + ". Reference " + d.id + ".", M, y);
+    footer();
+    return pdf;
+  }
+}
+
+/* ---------- send ---------- */
+function sendDialog(){
+  var d = S.doc;
+  loadProps().then(function(){
+    var rec = propRec(d.property) || {};
+    var subj = (S.type === "checklist" ? "Day porter service report - " + d.property + " - " + d.weekday + " " + d.service_date : "City Wide - " + d.property + " - " + d.category);
+    var msg = S.type === "checklist"
+      ? "Hello,\n\nAttached is the day porter service report for " + d.property + " for " + d.weekday + ", " + d.service_date + ". It shows the areas serviced, the tasks completed and photos from the shift." + (d.followups ? "\n\nItems reported to the property: " + d.followups : "") + "\n\nReply to this email with any questions.\n\nThank you,\nCity Wide Facility Solutions"
+      : "Hello " + (d.submitter || "").split(" ")[0] + ",\n\nAttached is the summary of your " + (/request/i.test(d.mode) ? "request" : "report") + " for " + d.property + (d.response ? " and City Wide's response." : ".") + "\n\nReply to this email with any questions.\n\nThank you,\nCity Wide Facility Solutions";
+    var to = S.type === "report" ? (d.email || rec.contact_email || "") : (rec.contact_email || "");
+    var m = document.createElement("div"); m.className = "modal";
+    m.innerHTML = '<div class="box"><h3>Send to the property</h3>' +
+      (S.pdf ? '<div class="note ok">PDF built: ' + esc(S.pdfName) + '</div>' : '<div class="note info">The PDF is built fresh when you send.</div>') +
+      '<div class="field"><label>To</label><input type="text" id="mTo" value="' + esc(to) + '" placeholder="manager@ovationco.com, second@ovationco.com"></div>' +
+      '<div class="field"><label>CC</label><input type="text" id="mCc" value="' + esc(rec.cc_email || "") + '" placeholder="Optional"></div>' +
+      '<div class="field"><label>Reply-to</label><input type="text" id="mReply" value="' + esc(rec.fsm_email || "") + '" placeholder="Your email, so replies come to you"></div>' +
+      '<div class="field"><label>Subject</label><input type="text" id="mSub" value="' + esc(subj) + '"></div>' +
+      '<div class="field"><label>Message</label><textarea id="mMsg" style="min-height:150px">' + esc(msg) + '</textarea></div>' +
+      '<label class="check" style="border:0"><input type="checkbox" id="mRemember" checked><span>Remember these addresses for ' + esc(d.property) + ' (Properties tab)</span></label>' +
+      '<div class="err" id="mErr"></div><div class="btnrow"><button type="button" class="btn ghost" id="mCancel">Cancel</button><button type="button" class="btn" id="mSend">Send</button></div></div>';
+    document.body.appendChild(m);
+    $("mCancel").addEventListener("click", function(){ m.remove(); });
+    $("mSend").addEventListener("click", function(){
+      var toV = $("mTo").value.trim(); if(!/@/.test(toV)){ $("mErr").textContent = "Enter at least one To address."; return; }
+      var b = $("mSend"); b.disabled = true; b.textContent = "Sending...";
+      var chain = S.dirty ? save() : Promise.resolve();
+      chain.then(function(){ return S.pdf ? S.pdf : buildPdf(false); }).then(function(pdf){
+        return api("ov_send", { id:d.id, to:toV, cc:$("mCc").value, reply_to:$("mReply").value, subject:$("mSub").value, message:$("mMsg").value, pdf:pdf, filename:S.pdfName, fsm_name:$("me").value });
+      }).then(function(r){
+        if(!r.ok) throw new Error(r.error);
+        if($("mRemember").checked){ api("ov_property_set", { property:d.property, contact_email: S.type === "report" ? (rec.contact_email || toV) : toV, cc_email:$("mCc").value, fsm_email:$("mReply").value, fsm:$("me").value }).catch(function(){}); S.props = []; }
+        m.remove(); toast("Sent to " + r.sent_to.join(", ")); S.doc.status = "Sent"; S.index.status = "Sent"; S.index.sent_at = r.sent_at; S.index.sent_to = r.sent_to.concat(r.cc || []).join(", "); paintDetail(); load();
+      }).catch(function(e){ b.disabled = false; b.textContent = "Send"; $("mErr").textContent = e.message || String(e); });
+    });
+  });
+}
+
+load();
+})();
+</script>
+</body>
+</html>

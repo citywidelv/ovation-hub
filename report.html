@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Report or Request | Ovation Hub</title>
+<!-- build 2026-10-22: Ovation observation / work request form. Cascade: property -> who you are ->
+     report or request -> category -> detail questions -> photos -> submit (kind ov_submit, Ovation.gs).
+     Saves to the CW Ovation Hub book and emails Config!report_notify. No fetch on load. -->
+<link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
+<link rel="stylesheet" href="ov.css">
+<style>
+.step{display:none}
+.step.show{display:block}
+.qa{margin:14px 0 0}
+.qa .q{font-size:14px;font-weight:700;margin-bottom:8px}
+.qa .q small{display:block;font-weight:400;color:var(--grey);font-size:12px;margin-top:2px}
+.scope{font-size:13px;color:var(--grey);margin-top:6px}
+</style>
+<link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
+</head>
+<body>
+<header class="top">
+<div class="bar">
+<a class="back" href="index.html">&larr; Ovation Hub</a>
+<div class="tag"><b>Report or Request</b>Ovation Property Management</div>
+</div>
+</header>
+
+<main class="wrap" id="form">
+<h1>Report or Request</h1>
+<div class="lead">Tell City Wide what you noticed or what you need. Your Facility Solutions Manager gets it right away.</div>
+
+<!-- 1. property + who -->
+<div class="card" id="s1">
+<h2>1. Your community</h2>
+<div class="field"><label for="prop">Which property? <span class="req">*</span></label><select id="prop"></select><div class="scope" id="propScope"></div></div>
+<div class="row2">
+<div class="field"><label for="who">Your name <span class="req">*</span></label><input type="text" id="who" autocomplete="name" placeholder="First and last name"></div>
+<div class="field"><label for="role">Your role <span class="req">*</span></label><select id="role">
+<option value="">Pick one</option><option>Community Manager</option><option>Assistant Manager</option><option>Leasing</option><option>Maintenance</option><option>Regional / Corporate</option><option>Resident</option><option>Other</option></select></div>
+</div>
+<div class="row2">
+<div class="field"><label for="phone">Phone <span class="req">*</span></label><input type="tel" id="phone" autocomplete="tel" placeholder="702-555-0100"></div>
+<div class="field"><label for="email">Email <span class="req">*</span></label><input type="email" id="email" autocomplete="email" placeholder="you@ovationco.com"><div class="hint">City Wide replies here.</div></div>
+</div>
+</div>
+
+<!-- 2. mode -->
+<div class="card" id="s2">
+<h2>2. What do you need today?</h2>
+<div class="chips big" id="modeChips">
+<button type="button" class="chip" data-v="Report">Report something<small>A compliment, a concern, a spill, a missed task, a no-show</small></button>
+<button type="button" class="chip" data-v="Request">Request extra work<small>Carpet cleaning, floor care, window cleaning, unit make-ready, other projects</small></button>
+</div>
+</div>
+
+<!-- 3. category -->
+<div class="card step" id="s3">
+<h2 id="s3h">3. What kind of report?</h2>
+<div class="chips" id="catChips"></div>
+<div id="catNote"></div>
+</div>
+
+<!-- 4. detail -->
+<div class="card step" id="s4">
+<h2>4. Details</h2>
+<div id="detail"></div>
+<div class="field qa"><div class="q">Anything else City Wide should know?</div><textarea id="notes" placeholder="Type here"></textarea></div>
+</div>
+
+<!-- 5. photos -->
+<div class="card step plain" id="s5">
+<h2>5. Photos <span style="font-weight:400;color:var(--grey);font-size:13px">(optional, up to 4)</span></h2>
+<div class="photos"><div class="pgrid" id="pgrid"></div><div class="pcount" id="pcount"></div></div>
+<input type="file" id="pfile" accept="image/*" capture="environment" class="hidden">
+</div>
+
+<div class="step" id="s6">
+<div class="err" id="ferr"></div>
+<button class="btn" id="submit">Send to City Wide</button>
+<div class="note" style="margin-top:10px">Nothing is shared outside City Wide and your property's management team.</div>
+</div>
+</main>
+
+<main class="wrap hidden" id="doneWrap">
+<div class="card plain done">
+<div class="big">&#10003;</div>
+<h2>Sent to City Wide</h2>
+<p id="doneText"></p>
+<div class="kv" style="justify-content:center;margin-bottom:16px">Reference <span class="ref" id="doneRef"></span></div>
+<div id="donePhotos"></div>
+<div class="btnrow"><a class="btn ghost" href="report.html">Send another</a><a class="btn dark" href="index.html">Back to the hub</a></div>
+</div>
+</main>
+
+<script src="ov-shared.js"></script>
+<script>
+(function(){
+var $ = OV.$, esc = OV.esc;
+if(!OV.require()) return;
+
+/* ---------- cascade definitions ---------- */
+var SOW_AREAS = OV.AREAS.map(function(a){ return a.name; });
+var CATS = {
+  Report: [
+    { v:"Compliment", note:"", q:[
+      { id:"about", t:"Who or what is the compliment about?", type:"text", ph:"Porter's name, or the area that looked great" },
+      { id:"what", t:"Tell us what happened", type:"textarea", req:true } ] },
+    { v:"Needs improvement", q:[
+      { id:"area", t:"Which area?", type:"chips", opts:SOW_AREAS.concat(["Other"]), req:true },
+      { id:"issue", t:"What did you notice?", sub:"Pick all that apply", type:"multi", req:true, opts:["Trash not emptied", "Floors not swept or mopped", "Restroom not stocked", "Restroom not clean", "Glass or mirrors smudged", "Pet station full", "Dumpster area messy", "Pool deck or furniture dirty", "Touch points not wiped", "Task done but not well", "Other"] },
+      { id:"when", t:"When did you notice it?", type:"chips", opts:["Today", "Yesterday", "This week", "It keeps happening"], req:true },
+      { id:"urgency", t:"How soon does it need attention?", type:"chips", opts:["Today", "Within 24 hours", "This week"], req:true, urgency:true },
+      { id:"where", t:"Where exactly?", type:"text", ph:"Building, floor, or spot", loc:true } ] },
+    { v:"Needs support", note:"Use this when the porter or the property needs something from City Wide: a schedule change, access, supplies, coverage.", q:[
+      { id:"need", t:"What is needed?", type:"chips", req:true, opts:["Start time or schedule change", "Extra hours or event coverage", "Access, keys or fob", "Supplies or dispenser refills", "Janitor closet or storage", "Trash pickup day changed", "Pool or amenity hours changed", "Something else"] },
+      { id:"detail", t:"Tell us more", type:"textarea", req:true, ph:"What changed, what the porter needs, who to coordinate with" },
+      { id:"effective", t:"When does this start?", type:"date" } ] },
+    { v:"Spill or hazard", urgent:true, q:[
+      { id:"where", t:"Where is it?", type:"chips", req:true, loc:true, opts:["Lobby or entry", "Elevator", "Hallway", "Stairwell", "Clubhouse or leasing office", "Fitness room", "Restroom", "Pool deck", "Pet area", "Breezeway or walkway", "Parking or garage", "Trash enclosure", "Inside a unit", "Other"] },
+      { id:"whereDetail", t:"Which building, floor or spot?", type:"text", ph:"Building 3, 2nd floor by the elevator" },
+      { id:"what", t:"What is it?", type:"chips", req:true, opts:["Liquid spill", "Food or soda", "Broken glass", "Pet waste", "Trash overflow", "Water leak or flooding", "Bodily fluids or needles", "Unknown chemical", "Graffiti", "Other"] },
+      { id:"risk", t:"Is anyone hurt, or is the area a slip or trip risk right now?", type:"chips", req:true, opts:["Yes", "No", "Not sure"] },
+      { id:"onsite", t:"Is the porter on site right now?", type:"chips", req:true, opts:["Yes", "No", "Not sure"] } ] },
+    { v:"Porter did not show or was late", q:[
+      { id:"date", t:"Which day?", type:"date", req:true },
+      { id:"expected", t:"Scheduled start", type:"time" },
+      { id:"arrived", t:"When did the porter arrive?", type:"chips", req:true, opts:["Did not arrive", "Under 30 minutes late", "30 to 60 minutes late", "More than an hour late", "Left early"] },
+      { id:"detail", t:"Anything else about it?", type:"textarea" } ] },
+    { v:"Something else", q:[ { id:"detail", t:"Tell us what is going on", type:"textarea", req:true }, { id:"urgency", t:"How soon does it need attention?", type:"chips", opts:["Today", "Within 24 hours", "This week", "No rush"], urgency:true } ] }
+  ],
+  Request: [
+    { v:"Carpet cleaning", q:[
+      { id:"where", t:"Where?", sub:"Pick all that apply", type:"multi", req:true, loc:true, opts:["Hallways", "Clubhouse", "Leasing office", "Fitness room", "Model unit", "Vacant unit", "Other common area"] },
+      { id:"whereDetail", t:"Which floors, buildings or unit numbers?", type:"text", ph:"Building 2 floors 1 to 4, unit 1203" },
+      { id:"concern", t:"What are we treating?", sub:"Pick all that apply", type:"multi", opts:["Routine cleaning", "Spots or stains", "Pet odor or urine", "Traffic lanes", "Water damage", "Not sure"] },
+      { id:"size", t:"About how much carpet?", type:"text", ph:"Square feet, number of rooms, or number of floors" } ] },
+    { v:"Floor care", q:[
+      { id:"floor", t:"What kind of floor?", type:"chips", req:true, opts:["LVT or LVP (plank)", "Tile and grout", "Concrete or garage", "VCT", "Stone", "Not sure"] },
+      { id:"service", t:"What does it need?", sub:"Pick all that apply", type:"multi", req:true, opts:["Machine scrub", "Scuff mark removal", "Strip and refinish", "Buff or burnish", "Grout cleaning", "Not sure, come look"] },
+      { id:"where", t:"Where?", type:"text", req:true, loc:true, ph:"Lobby, clubhouse, hallways building 1" },
+      { id:"size", t:"About how big is the area?", type:"text", ph:"Square feet or a description" } ] },
+    { v:"Window cleaning", q:[
+      { id:"side", t:"Interior, exterior or both?", type:"chips", req:true, opts:["Interior", "Exterior", "Both"] },
+      { id:"which", t:"Which glass?", sub:"Pick all that apply", type:"multi", req:true, loc:true, opts:["Clubhouse and leasing office", "Fitness room", "Lobby entries", "Hallway windows", "Pool-side glass", "Whole building exterior", "Other"] },
+      { id:"stories", t:"How many stories?", type:"chips", opts:["1", "2", "3", "4 or more"] },
+      { id:"count", t:"About how many windows or panes?", type:"text", ph:"A rough count is fine" } ] },
+    { v:"Unit make-ready", note:"Unit cleaning is quoted per unit. Vacant and move-in ready cleaning is outside the daily porter scope, so it goes on a separate quote.", q:[
+      { id:"units", t:"Unit number(s)", type:"text", req:true, loc:true, ph:"1203, 1405" },
+      { id:"bed", t:"Bedrooms / baths", type:"chips", opts:["Studio", "1 / 1", "2 / 1", "2 / 2", "3 / 2", "Other"] },
+      { id:"clean", t:"What does the unit need?", sub:"Pick all that apply", type:"multi", req:true, opts:["Full make-ready clean", "Fluff clean (touch-up before move-in)", "Trash-out", "Appliance clean only", "Carpet clean", "Painting touch-ups", "Blinds cleaning", "Other"] },
+      { id:"status", t:"Is the unit vacant?", type:"chips", req:true, opts:["Vacant", "Occupied", "Vacates soon"] },
+      { id:"movein", t:"Move-in or ready-by date", type:"date" },
+      { id:"access", t:"How do we get in?", type:"chips", opts:["Keys at the office", "Lockbox", "Maintenance will let us in", "Other"] } ] },
+    { v:"Something else", q:[
+      { id:"what", t:"What kind of work?", type:"chips", req:true, opts:["Pressure washing", "Clubhouse deep clean", "Event setup or cleanup", "Trash-out or bulk haul", "Post-construction clean", "Other"] },
+      { id:"detail", t:"Describe what you need", type:"textarea", req:true } ] }
+  ]
+};
+var REQUEST_TAIL = [
+  { id:"needby", t:"When do you need it done?", type:"chips", req:true, urgency:true, opts:["As soon as possible", "This week", "Next week", "Pick a date"] },
+  { id:"needbyDate", t:"Date", type:"date", showIf:{ needby:"Pick a date" } },
+  { id:"approver", t:"Who approves the quote?", type:"text", ph:"Name and email, if not you" }
+];
+
+/* Apartment-complex logic for spills and hazards. Shown as soon as the answer is picked. */
+function hazardNotes(a){
+  var out = [];
+  var what = a.what, where = a.where;
+  if(what === "Bodily fluids or needles") out.push({ k:"warn", h:"Biohazard", t:"Bodily fluids and needles are outside the day porter scope. Ask the porter to cone off or block the area and keep residents away. City Wide will call you about a specialty cleanup quote. Submit this so it is on record." });
+  if(what === "Water leak or flooding") out.push({ k:"warn", h:"Water first", t:"Call property maintenance to stop the water. The porter can set wet-floor signs and contain the spread while you wait." });
+  if(what === "Unknown chemical") out.push({ k:"warn", h:"Unknown chemical", t:"Keep residents away and ventilate if you can. Do not have the porter clean it until it is identified. If anyone feels sick, call 911." });
+  if(what === "Graffiti") out.push({ k:"info", h:"Graffiti", t:"Graffiti removal is not in the porter scope; the porter reports it. City Wide can quote removal. Send a photo below so we can price it." });
+  if(what === "Broken glass" || what === "Liquid spill" || what === "Food or soda" || what === "Pet waste" || what === "Trash overflow") out.push({ k:"info", h:"In scope", t:"The porter handles this on the next return pass. If the porter is on site, call or radio them now and submit this so City Wide has the record." });
+  if(where === "Inside a unit") out.push({ k:"info", h:"Inside a unit", t:"Resident unit interiors are not in the porter scope. If the unit is vacant, City Wide can quote a unit clean. Use Request extra work > Unit make-ready for that." });
+  if(where === "Elevator" && what && what !== "Graffiti") out.push({ k:"info", h:"Elevator", t:"If the mess is on the buttons or the cab floor, the porter disinfects it on the next pass. A liquid on the elevator floor is a slip risk; keep the cab out of service until it is dry if you can." });
+  if(a.risk === "Yes") out.push({ k:"warn", h:"Someone is at risk", t:"Block the area off now. If anyone is hurt, call 911 first. Then call City Wide at 702-483-1874 so we can reach the porter and the FSM." });
+  if(a.onsite === "Yes") out.push({ k:"ok", h:"Porter is on site", t:"Fastest fix: call or radio the porter now. We will still log this and follow up." });
+  if(a.onsite === "No") out.push({ k:"info", h:"Porter is off shift", t:"City Wide will reach the porter or the FSM. For a slip risk, cone or block the area until someone can get there." });
+  return out;
+}
+
+/* ---------- state ---------- */
+var S = { mode:"", cat:"", a:{}, photos:[] };
+var saveT = null;
+function persist(){ clearTimeout(saveT); saveT = setTimeout(function(){
+  OV.saveDraft("report", { prop:$("prop").value, who:$("who").value, role:$("role").value, phone:$("phone").value, email:$("email").value, mode:S.mode, cat:S.cat, a:S.a, notes:$("notes").value });
+}, 250); }
+
+$("prop").innerHTML = OV.propertyOptions(false);
+var d0 = OV.loadDraft("report");
+if(d0){ ["prop","who","role","phone","email","notes"].forEach(function(k){ if(d0[k]) $(k).value = d0[k]; }); S.mode = d0.mode || ""; S.cat = d0.cat || ""; S.a = d0.a || {}; }
+else { try { var w = localStorage.getItem("cwOvWho"); if(w){ var o = JSON.parse(w); ["who","role","phone","email"].forEach(function(k){ if(o[k]) $(k).value = o[k]; }); } } catch(e){} }
+
+function propScope(){
+  var p = OV.byName($("prop").value);
+  var el = $("propScope");
+  if(!p){ el.textContent = ""; return; }
+  el.textContent = p.address + (p.awarded ? "" : ". City Wide does not yet provide day porter service at this community; requests are still welcome.");
+}
+$("prop").addEventListener("change", function(){ propScope(); persist(); });
+["who","role","phone","email","notes"].forEach(function(k){ $(k).addEventListener("input", persist); $(k).addEventListener("change", persist); });
+propScope();
+
+function chip(v, on, extra){ return '<button type="button" class="chip' + (on ? ' on' : '') + '" data-v="' + esc(v) + '"' + (extra || '') + '>' + esc(v) + '</button>'; }
+function renderMode(){
+  $("modeChips").querySelectorAll(".chip").forEach(function(b){ b.classList.toggle("on", b.getAttribute("data-v") === S.mode); });
+  $("s3").classList.toggle("show", !!S.mode);
+  if(!S.mode){ $("s4").classList.remove("show"); $("s5").classList.remove("show"); $("s6").classList.remove("show"); return; }
+  $("s3h").textContent = S.mode === "Report" ? "3. What kind of report?" : "3. What kind of work?";
+  $("catChips").innerHTML = CATS[S.mode].map(function(c){ return chip(c.v, c.v === S.cat); }).join("");
+  renderCat();
+}
+function catDef(){ return (CATS[S.mode] || []).filter(function(c){ return c.v === S.cat; })[0] || null; }
+function questions(){
+  var c = catDef(); if(!c) return [];
+  return S.mode === "Request" ? c.q.concat(REQUEST_TAIL) : c.q;
+}
+function renderCat(){
+  var c = catDef();
+  $("catNote").innerHTML = c && c.note ? '<div class="note info">' + esc(c.note) + '</div>' : "";
+  var on = !!c;
+  $("s4").classList.toggle("show", on); $("s5").classList.toggle("show", on); $("s6").classList.toggle("show", on);
+  if(on) renderDetail();
+}
+function visible(q){
+  if(!q.showIf) return true;
+  return Object.keys(q.showIf).every(function(k){ return S.a[k] === q.showIf[k]; });
+}
+function renderDetail(){
+  var qs = questions();
+  var html = "";
+  qs.forEach(function(q){
+    if(!visible(q)) return;
+    var v = S.a[q.id];
+    html += '<div class="field qa" data-q="' + q.id + '"><div class="q">' + esc(q.t) + (q.req ? ' <span class="req">*</span>' : '') + (q.sub ? '<small>' + esc(q.sub) + '</small>' : '') + '</div>';
+    if(q.type === "chips") html += '<div class="chips" data-id="' + q.id + '">' + q.opts.map(function(o){ return chip(o, v === o); }).join("") + '</div>';
+    else if(q.type === "multi") html += '<div class="chips multi" data-id="' + q.id + '">' + q.opts.map(function(o){ return chip(o, (v || []).indexOf(o) >= 0); }).join("") + '</div>';
+    else if(q.type === "textarea") html += '<textarea data-id="' + q.id + '" placeholder="' + esc(q.ph || "") + '">' + esc(v || "") + '</textarea>';
+    else html += '<input type="' + (q.type === "text" ? "text" : q.type) + '" data-id="' + q.id + '" value="' + esc(v || "") + '" placeholder="' + esc(q.ph || "") + '">';
+    html += '</div>';
+    if(S.cat === "Spill or hazard" && q.id === "onsite") html += '<div id="hazNotes"></div>';
+  });
+  $("detail").innerHTML = html;
+  $("detail").querySelectorAll(".chips").forEach(function(box){
+    var id = box.getAttribute("data-id"), multi = box.classList.contains("multi");
+    box.querySelectorAll(".chip").forEach(function(b){
+      b.addEventListener("click", function(){
+        var val = b.getAttribute("data-v");
+        if(multi){ var arr = (S.a[id] || []).slice(); var i = arr.indexOf(val); if(i >= 0) arr.splice(i, 1); else arr.push(val); S.a[id] = arr; b.classList.toggle("on"); }
+        else { S.a[id] = (S.a[id] === val) ? "" : val; box.querySelectorAll(".chip").forEach(function(x){ x.classList.toggle("on", x.getAttribute("data-v") === S.a[id]); }); }
+        persist(); afterPick(id);
+      });
+    });
+  });
+  $("detail").querySelectorAll("input,textarea").forEach(function(el){
+    el.addEventListener("input", function(){ S.a[el.getAttribute("data-id")] = el.value; persist(); });
+  });
+  hazard();
+}
+function afterPick(id){
+  /* a chip that reveals or hides another question re-renders the block */
+  var qs = questions();
+  var dependent = qs.some(function(q){ return q.showIf && q.showIf[id] !== undefined; });
+  if(dependent) renderDetail(); else hazard();
+}
+function hazard(){
+  var box = $("hazNotes"); if(!box) return;
+  if(S.cat !== "Spill or hazard") { box.innerHTML = ""; return; }
+  box.innerHTML = hazardNotes(S.a).map(function(n){ return '<div class="note ' + n.k + '"><b>' + esc(n.h) + '.</b> ' + esc(n.t) + '</div>'; }).join("");
+}
+
+$("modeChips").querySelectorAll(".chip").forEach(function(b){
+  b.addEventListener("click", function(){ var v = b.getAttribute("data-v"); if(S.mode !== v){ S.mode = v; S.cat = ""; S.a = {}; } renderMode(); persist(); });
+});
+$("catChips").addEventListener("click", function(e){
+  var b = e.target.closest(".chip"); if(!b) return;
+  var v = b.getAttribute("data-v"); if(S.cat !== v){ S.cat = v; S.a = {}; }
+  $("catChips").querySelectorAll(".chip").forEach(function(x){ x.classList.toggle("on", x.getAttribute("data-v") === S.cat); });
+  renderCat(); persist();
+});
+renderMode();
+
+/* ---------- photos ---------- */
+var MAXP = 4;
+function renderPhotos(){
+  var g = $("pgrid");
+  g.innerHTML = S.photos.map(function(p, i){ return '<div class="ph"><img src="' + p.thumb + '" alt=""><button type="button" class="rm" data-i="' + i + '" aria-label="Remove photo">&times;</button></div>'; }).join("") +
+    (S.photos.length < MAXP ? '<div class="add" id="padd"><span class="big">+</span>Add photo</div>' : "");
+  $("pcount").textContent = S.photos.length ? S.photos.length + " of " + MAXP : "";
+  var add = $("padd"); if(add) add.addEventListener("click", function(){ $("pfile").value = ""; $("pfile").click(); });
+  g.querySelectorAll(".rm").forEach(function(b){ b.addEventListener("click", function(){ S.photos.splice(Number(b.getAttribute("data-i")), 1); renderPhotos(); }); });
+}
+$("pfile").addEventListener("change", function(){
+  var f = $("pfile").files && $("pfile").files[0]; if(!f) return;
+  OV.shrink(f, 1280, 0.74).then(function(r){ return OV.thumb(r.data, 240).then(function(t){ S.photos.push({ pid: OV.uid("ph_"), data:r.data, thumb:t, w:r.w, h:r.h }); renderPhotos(); }); })
+    .catch(function(){ $("ferr").textContent = "Could not read that photo. Try another."; });
+});
+renderPhotos();
+
+/* ---------- submit ---------- */
+function val(id){ return String($(id).value || "").trim(); }
+function validateForm(){
+  if(!val("prop")) return "Pick the property.";
+  if(!val("who")) return "Enter your name.";
+  if(!val("role")) return "Pick your role.";
+  if(!val("phone")) return "Enter a phone number.";
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val("email"))) return "Enter a valid email so City Wide can reply.";
+  if(!S.mode) return "Pick Report something or Request extra work.";
+  if(!S.cat) return "Pick the kind of " + (S.mode === "Report" ? "report." : "work.");
+  var qs = questions();
+  for(var i = 0; i < qs.length; i++){
+    var q = qs[i]; if(!q.req || !visible(q)) continue;
+    var v = S.a[q.id];
+    if(q.type === "multi" ? !(v && v.length) : !String(v || "").trim()) return "Answer: " + q.t;
+  }
+  return "";
+}
+function summaryLine(){
+  var parts = [];
+  var qs = questions();
+  qs.forEach(function(q){ if(!visible(q)) return; var v = S.a[q.id]; if(!v || (Array.isArray(v) && !v.length)) return; if(q.type === "textarea" || q.type === "text") return; parts.push(Array.isArray(v) ? v.join(", ") : v); });
+  var txt = ["what","detail","issue"].map(function(k){ return S.a[k]; }).filter(function(v){ return v && typeof v === "string"; })[0] || "";
+  var line = S.cat + (parts.length ? ": " + parts.join(" | ") : "") + (txt ? " - " + txt : "");
+  return line.slice(0, 400);
+}
+$("submit").addEventListener("click", function(){
+  var e = validateForm();
+  $("ferr").textContent = e; if(e){ var bad = document.querySelector(".err"); window.scrollTo({ top: Math.max(0, $("submit").getBoundingClientRect().top + window.scrollY - 200), behavior:"smooth" }); return; }
+  var qs = questions();
+  var answers = qs.filter(visible).map(function(q){ return { id:q.id, q:q.t, a:S.a[q.id] || "" }; }).filter(function(x){ return x.a && (!Array.isArray(x.a) || x.a.length); });
+  var urg = "", loc = "";
+  qs.forEach(function(q){ if(q.urgency && S.a[q.id]) urg = S.a[q.id] === "Pick a date" ? (S.a.needbyDate || "Pick a date") : S.a[q.id]; if(q.loc && S.a[q.id]) loc = (loc ? loc + "; " : "") + (Array.isArray(S.a[q.id]) ? S.a[q.id].join(", ") : S.a[q.id]); });
+  if(S.a.whereDetail) loc = (loc ? loc + " - " : "") + S.a.whereDetail;
+  var c = catDef();
+  if(c && c.urgent) urg = urg || "Today";
+  var sub = "";
+  var first = qs.filter(function(q){ return (q.type === "chips" || q.type === "multi") && visible(q) && S.a[q.id] && String(S.a[q.id]).length; })[0];
+  if(first) sub = Array.isArray(S.a[first.id]) ? S.a[first.id].join(", ") : S.a[first.id];
+  var doc = {
+    id: OV.uid("ovr_"),
+    created_at: new Date().toISOString(),
+    property: val("prop"), submitter: val("who"), role: val("role"), phone: val("phone"), email: val("email"),
+    mode: S.mode, category: S.cat, subcategory: sub.slice(0, 120), urgency: urg, location: loc.slice(0, 300),
+    summary: summaryLine(), notes: val("notes"),
+    answers: answers,
+    hazard_notes: S.cat === "Spill or hazard" ? hazardNotes(S.a).map(function(n){ return n.h + ": " + n.t; }) : [],
+    photos: S.photos.map(function(p){ return { pid:p.pid, w:p.w, h:p.h }; }),
+    status: "New"
+  };
+  var btn = $("submit"); btn.disabled = true; btn.textContent = "Sending...";
+  try { localStorage.setItem("cwOvWho", JSON.stringify({ who:doc.submitter, role:doc.role, phone:doc.phone, email:doc.email })); } catch(e2){}
+  OV.api("ov_submit", { doc: doc }).then(function(r){
+    if(!r || !r.ok){ throw new Error((r && r.error) || "Could not send"); }
+    OV.clearDraft("report");
+    $("form").classList.add("hidden"); $("doneWrap").classList.remove("hidden"); window.scrollTo(0, 0);
+    $("doneRef").textContent = doc.id;
+    $("doneText").textContent = (S.mode === "Report" ? "Your report" : "Your request") + " for " + doc.property + " is with the City Wide team. " + (S.mode === "Request" ? "Expect a call or email about scheduling and a quote." : "Expect a reply at " + doc.email + ".");
+    if(S.photos.length){
+      $("donePhotos").innerHTML = '<div class="note info" id="pstat">Uploading photos...</div><div class="progress"><i id="pbar"></i></div>';
+      OV.uploadPhotos(doc.id, S.photos, function(i, n){ $("pbar").style.width = Math.round(((i + 1) / n) * 100) + "%"; $("pstat").textContent = "Uploading photo " + (i + 1) + " of " + n + "..."; })
+        .then(function(failed){ $("pstat").className = "note " + (failed ? "warn" : "ok"); $("pstat").textContent = failed ? failed + " photo(s) did not upload. Your report was still sent." : "Photos uploaded."; });
+    }
+  }).catch(function(err){
+    btn.disabled = false; btn.textContent = "Send to City Wide";
+    var m = String(err && err.message || err);
+    if(/passcode/i.test(m)) return OV.locked(m);
+    $("ferr").textContent = /fetch|network|json/i.test(m) ? "Could not reach City Wide. Check your connection and tap Send again. Nothing you typed is lost." : m;
+  });
+});
+})();
+</script>
+</body>
+</html>

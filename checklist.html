@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Porter Daily Checklist | Ovation Hub</title>
+<!-- build 2026-10-22: Porter Daily Checklist for the awarded Ovation properties. Areas and tasks come
+     from the Aspire at Redwood day porter workflow (OV.AREAS in ov-shared.js). 1 to 2 photos per area.
+     Saves to the phone as the porter works (localStorage + IndexedDB photos), then kind ov_submit and
+     ov_photo_put one photo at a time. No email. The FSM reviews it in review.html. -->
+<link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
+<link rel="stylesheet" href="ov.css">
+<style>
+.day{font-size:13px;color:var(--grey);margin-top:-8px;margin-bottom:12px}
+.day b{color:var(--black)}
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+.quick .chip{font-size:13px;min-height:38px;padding:7px 12px}
+</style>
+<link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
+</head>
+<body>
+<header class="top">
+<div class="bar">
+<a class="back" href="index.html">&larr; Ovation Hub</a>
+<div class="tag"><b>Porter Daily Checklist</b>City Wide day porter</div>
+</div>
+</header>
+
+<main class="wrap" id="form">
+<h1>Porter Daily Checklist</h1>
+<div class="lead">Work through the areas, tick what you did, add 1 or 2 photos per area. Everything saves on this phone as you go.</div>
+
+<div id="resume"></div>
+
+<div class="card" id="s1">
+<h2>Today</h2>
+<div class="field"><label for="prop">Property <span class="req">*</span></label><select id="prop"></select></div>
+<div class="row2">
+<div class="field"><label for="date">Date <span class="req">*</span></label><input type="date" id="date"></div>
+<div class="field"><label for="porter">Porter name <span class="req">*</span></label><input type="text" id="porter" autocomplete="name" placeholder="First and last name"></div>
+</div>
+<div class="day" id="dayline"></div>
+<div class="row2">
+<div class="field"><label for="start">Shift start</label><input type="time" id="start"></div>
+<div class="field"><label for="end">Shift end</label><input type="time" id="end"></div>
+</div>
+</div>
+
+<div class="card black" id="passesCard">
+<h2>Passes completed</h2>
+<div class="sub">The order of the day from the scope of work.</div>
+<div id="passes"></div>
+</div>
+
+<h2 style="margin:18px 0 8px">Areas</h2>
+<div id="areas"></div>
+
+<div class="card plain">
+<h2>Things to report to the property</h2>
+<div class="sub">Lights out, damage, graffiti, safety hazards, dumpster overflow. Tap any that apply, then add detail.</div>
+<div class="quick" id="fuChips"></div>
+<textarea id="followups" placeholder="Where and what. Example: Building 2 stairwell light out, 3rd floor."></textarea>
+<div class="photos" style="margin-top:12px"><div class="lbl" style="font-size:13px;font-weight:700;margin-bottom:6px">Photos of anything you are reporting (optional)</div><div class="pgrid" id="fuGrid"></div></div>
+</div>
+
+<div class="card plain">
+<h2>Supplies running low</h2>
+<textarea id="supplies" placeholder="Liners, paper, soap, pet bags, chemicals"></textarea>
+</div>
+
+<div class="card plain">
+<label class="check" style="border:0"><input type="checkbox" id="confirm"><span>The tasks I checked above were completed today, and the photos are from this shift.</span></label>
+<div class="err" id="ferr"></div>
+</div>
+<input type="file" id="pfile" accept="image/*" capture="environment" class="hidden">
+</main>
+
+<div class="sticky" id="bar">
+<div class="in"><div class="st" id="barst">0 of 0 areas done</div><button class="btn" id="submit">Submit checklist</button></div>
+</div>
+
+<main class="wrap hidden" id="doneWrap">
+<div class="card plain done">
+<div class="big">&#10003;</div>
+<h2>Checklist submitted</h2>
+<p id="doneText"></p>
+<div id="donePhotos"></div>
+<div class="kv" style="justify-content:center;margin:14px 0"><span>Reference <span class="ref" id="doneRef"></span></span></div>
+<div class="btnrow"><a class="btn dark" href="checklist.html">Start tomorrow's checklist</a><a class="btn ghost" href="index.html">Back to the hub</a></div>
+</div>
+</main>
+
+<script src="ov-shared.js"></script>
+<script>
+(function(){
+var $ = OV.$, esc = OV.esc;
+if(!OV.require()) return;
+var AREAS = OV.AREAS;
+var FU = ["Light out", "Damage", "Graffiti", "Safety hazard", "Dumpster overflow", "Dumpster access blocked", "Pest activity", "Signage missing or damaged", "Water leak", "Pool or gate issue"];
+
+/* ---------- state ---------- */
+function blank(){
+  return { id: OV.uid("ovc_"), property:"", service_date: OV.today(), weekday:"", porter:"", shift_start:"", shift_end:"",
+    passes: OV.PASSES.map(function(p){ return { t:p, done:false }; }),
+    areas: AREAS.map(function(a){ return { key:a.key, name:a.name, na:false, note:"", floors:"",
+      tasks: a.daily.map(function(t){ return { t:t, done:false, f:"daily" }; }).concat((a.weekly || []).map(function(t){ return { t:t, done:false, f:"weekly" }; })).concat((a.monthly || []).map(function(t){ return { t:t, done:false, f:"monthly" }; })),
+      photos: [] }; }),
+    followups:"", followup_tags:[], photos:[], supplies:"", status:"New" };
+}
+var S = OV.loadDraft("checklist") || blank();
+if(!S.id || !/^ovc_/.test(S.id)) S = blank();
+var THUMBS = {};   /* pid -> thumb data uri, memory only */
+var open = {};     /* area key -> expanded */
+
+var saveT = null;
+function persist(){ clearTimeout(saveT); saveT = setTimeout(function(){ OV.saveDraft("checklist", S); }, 200); }
+
+/* ---------- top fields ---------- */
+$("prop").innerHTML = OV.propertyOptions(true);
+$("prop").value = S.property; $("date").value = S.service_date || OV.today(); $("porter").value = S.porter || (function(){ try { return localStorage.getItem("cwOvPorter") || ""; } catch(e){ return ""; } })();
+$("start").value = S.shift_start || ""; $("end").value = S.shift_end || "";
+function dayline(){ S.weekday = OV.weekday($("date").value); $("dayline").innerHTML = S.weekday ? "<b>" + esc(S.weekday) + "</b>" + (S.property ? " at " + esc(S.property) : "") : ""; }
+function applyPropertyDefaults(){
+  var p = OV.byName(S.property);
+  S.areas.forEach(function(a){ var def = AREAS.filter(function(x){ return x.key === a.key; })[0]; if(def && def.midOnly && !a._touched) a.na = !(p && p.type === "mid"); });
+}
+$("prop").addEventListener("change", function(){ S.property = $("prop").value; applyPropertyDefaults(); dayline(); renderAreas(); persist(); });
+$("date").addEventListener("change", function(){ S.service_date = $("date").value; dayline(); persist(); });
+$("porter").addEventListener("input", function(){ S.porter = $("porter").value; persist(); });
+$("start").addEventListener("change", function(){ S.shift_start = $("start").value; persist(); });
+$("end").addEventListener("change", function(){ S.shift_end = $("end").value; persist(); });
+$("followups").value = S.followups || ""; $("supplies").value = S.supplies || "";
+$("followups").addEventListener("input", function(){ S.followups = $("followups").value; persist(); });
+$("supplies").addEventListener("input", function(){ S.supplies = $("supplies").value; persist(); });
+dayline();
+
+/* ---------- passes ---------- */
+function renderPasses(){
+  $("passes").innerHTML = S.passes.map(function(p, i){ return '<label class="check' + (p.done ? ' done' : '') + '"><input type="checkbox" data-i="' + i + '"' + (p.done ? ' checked' : '') + '><span>' + esc(p.t) + '</span></label>'; }).join("");
+  $("passes").querySelectorAll("input").forEach(function(c){ c.addEventListener("change", function(){ S.passes[Number(c.getAttribute("data-i"))].done = c.checked; renderPasses(); persist(); }); });
+}
+renderPasses();
+
+/* ---------- follow-up chips ---------- */
+function renderFu(){
+  $("fuChips").innerHTML = FU.map(function(t){ return '<button type="button" class="chip' + ((S.followup_tags || []).indexOf(t) >= 0 ? ' on red' : '') + '" data-v="' + esc(t) + '">' + esc(t) + '</button>'; }).join("");
+  $("fuChips").querySelectorAll(".chip").forEach(function(b){ b.addEventListener("click", function(){ var v = b.getAttribute("data-v"); S.followup_tags = S.followup_tags || []; var i = S.followup_tags.indexOf(v); if(i >= 0) S.followup_tags.splice(i, 1); else S.followup_tags.push(v); renderFu(); persist(); }); });
+}
+renderFu();
+
+/* ---------- areas ---------- */
+function areaDef(key){ return AREAS.filter(function(a){ return a.key === key; })[0]; }
+function areaState(a){
+  var def = areaDef(a.key);
+  if(a.na) return { cls:"na", st:"Not today", ok:true };
+  var daily = a.tasks.filter(function(t){ return t.f === "daily"; });
+  var done = daily.filter(function(t){ return t.done; }).length;
+  var needPhoto = !def.photoOptional && a.photos.length < 1;
+  var complete = done === daily.length && !needPhoto;
+  var st = done + "/" + daily.length + (needPhoto ? " · photo needed" : (a.photos.length ? " · " + a.photos.length + " photo" + (a.photos.length > 1 ? "s" : "") : ""));
+  return { cls: complete ? "complete" : "", st:st, ok:complete, need: needPhoto || (done > 0 && done < daily.length) };
+}
+function renderAreas(){
+  var host = $("areas");
+  host.innerHTML = S.areas.map(function(a, idx){
+    var def = areaDef(a.key), s = areaState(a), isOpen = !!open[a.key];
+    var h = '<div class="area ' + s.cls + (isOpen ? '' : ' closed') + '" data-k="' + a.key + '">';
+    h += '<div class="ahead" data-toggle="' + a.key + '"><div class="num">' + (idx + 1) + '</div><div class="t"><b>' + esc(a.name) + '</b>' + (def.sub ? '<small>' + esc(def.sub) + '</small>' : '') + '</div><div class="st ' + (s.ok ? 'ok' : (s.need ? 'need' : '')) + '">' + esc(s.st) + '</div></div>';
+    h += '<div class="abody">';
+    h += '<div class="tools"><button type="button" class="chip' + (a.na ? ' on' : '') + '" data-na="' + a.key + '">' + (a.na ? 'Not at this property / not today' : 'Not at this property / not today') + '</button>';
+    if(!a.na) h += '<button type="button" class="chip" data-all="' + a.key + '">Check all daily tasks</button>';
+    h += '</div>';
+    if(!a.na){
+      h += '<div class="tasks">';
+      ["daily","weekly","monthly"].forEach(function(f){
+        var list = a.tasks.map(function(t, i){ return { t:t, i:i }; }).filter(function(x){ return x.t.f === f; });
+        if(!list.length) return;
+        h += '<div class="grp">' + (f === "daily" ? "Each shift" : f === "weekly" ? "Weekly, tick if done today" : "Monthly, tick if done today") + '</div>';
+        list.forEach(function(x){ h += '<label class="check' + (x.t.done ? ' done' : '') + '"><input type="checkbox" data-task="' + a.key + ':' + x.i + '"' + (x.t.done ? ' checked' : '') + '><span>' + esc(x.t.t) + '</span></label>'; });
+      });
+      if(def.askFloors) h += '<div class="field" style="margin-top:10px"><label>Which hallway floors did you do today?</label><input type="text" data-floors="' + a.key + '" value="' + esc(a.floors || "") + '" placeholder="Building 1 floors 2 and 3"></div>';
+      h += '</div>';
+      h += '<div class="photos"><div class="grp">Photos' + (def.photoOptional ? ' (optional)' : ' (1 to 2)') + '</div><div class="pgrid">';
+      a.photos.forEach(function(p, i){ h += '<div class="ph"><img src="' + (THUMBS[p.pid] || "") + '" alt=""><button type="button" class="rm" data-rm="' + a.key + ':' + i + '" aria-label="Remove photo">&times;</button></div>'; });
+      if(a.photos.length < 2) h += '<div class="add' + (!def.photoOptional && !a.photos.length ? ' req' : '') + '" data-add="' + a.key + '"><span class="big">+</span>' + (a.photos.length ? 'Add 2nd photo' : 'Take photo') + '</div>';
+      h += '</div></div>';
+      h += '<div class="field" style="margin-top:10px"><label>Note for this area (optional)</label><input type="text" data-note="' + a.key + '" value="' + esc(a.note || "") + '" placeholder="Anything the property should know"></div>';
+    }
+    h += '</div></div>';
+    return h;
+  }).join("");
+  wire(); bar();
+}
+function find(key){ return S.areas.filter(function(a){ return a.key === key; })[0]; }
+function wire(){
+  var host = $("areas");
+  host.querySelectorAll("[data-toggle]").forEach(function(el){ el.addEventListener("click", function(){ var k = el.getAttribute("data-toggle"); open[k] = !open[k]; el.parentNode.classList.toggle("closed", !open[k]); }); });
+  host.querySelectorAll("[data-na]").forEach(function(b){ b.addEventListener("click", function(){ var a = find(b.getAttribute("data-na")); a.na = !a.na; a._touched = true; renderAreas(); persist(); }); });
+  host.querySelectorAll("[data-all]").forEach(function(b){ b.addEventListener("click", function(){ var a = find(b.getAttribute("data-all")); a.tasks.forEach(function(t){ if(t.f === "daily") t.done = true; }); renderAreas(); persist(); }); });
+  host.querySelectorAll("[data-task]").forEach(function(c){ c.addEventListener("change", function(){ var p = c.getAttribute("data-task").split(":"); var a = find(p[0]); a.tasks[Number(p[1])].done = c.checked; c.closest(".check").classList.toggle("done", c.checked); refreshHead(a); persist(); }); });
+  host.querySelectorAll("[data-floors]").forEach(function(i){ i.addEventListener("input", function(){ find(i.getAttribute("data-floors")).floors = i.value; persist(); }); });
+  host.querySelectorAll("[data-note]").forEach(function(i){ i.addEventListener("input", function(){ find(i.getAttribute("data-note")).note = i.value; persist(); }); });
+  host.querySelectorAll("[data-add]").forEach(function(b){ b.addEventListener("click", function(){ pendingArea = b.getAttribute("data-add"); $("pfile").value = ""; $("pfile").click(); }); });
+  host.querySelectorAll("[data-rm]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-rm").split(":"); var a = find(p[0]); var ph = a.photos.splice(Number(p[1]), 1)[0]; if(ph){ delete THUMBS[ph.pid]; OV.photoDrop(S.id + ":" + ph.pid); } renderAreas(); persist(); }); });
+}
+function refreshHead(a){
+  var el = $("areas").querySelector('.area[data-k="' + a.key + '"]'); if(!el) return;
+  var s = areaState(a); el.className = "area " + s.cls + (open[a.key] ? "" : " closed");
+  var st = el.querySelector(".ahead .st"); st.className = "st " + (s.ok ? "ok" : (s.need ? "need" : "")); st.textContent = s.st;
+  bar();
+}
+function counts(){
+  var done = 0, total = 0, photos = 0;
+  S.areas.forEach(function(a){ if(a.na) return; total++; if(areaState(a).ok) done++; photos += a.photos.length; });
+  return { done:done, total:total, photos: photos + (S.photos || []).length };
+}
+function bar(){ var c = counts(); $("barst").textContent = c.done + " of " + c.total + " areas done · " + c.photos + " photo" + (c.photos === 1 ? "" : "s"); }
+
+/* ---------- photos ---------- */
+var pendingArea = "";   /* area key, or "fu" for follow-up photos */
+$("pfile").addEventListener("change", function(){
+  var f = $("pfile").files && $("pfile").files[0]; if(!f) return;
+  var target = pendingArea; pendingArea = "";
+  OV.shrink(f, 1280, 0.74).then(function(r){
+    var pid = OV.uid("ph_");
+    return OV.thumb(r.data, 240).then(function(t){
+      THUMBS[pid] = t;
+      var rec = { pid:pid, w:r.w, h:r.h, at:new Date().toISOString() };
+      if(target === "fu") S.photos.push(rec); else find(target).photos.push(rec);
+      return OV.photoStore(S.id + ":" + pid, r.data).then(function(ok){ if(!ok){ rec._mem = r.data; } });
+    });
+  }).then(function(){ if(target === "fu") renderFuPhotos(); else renderAreas(); persist(); })
+    .catch(function(){ $("ferr").textContent = "Could not read that photo. Try again."; });
+});
+function renderFuPhotos(){
+  var g = $("fuGrid");
+  g.innerHTML = (S.photos || []).map(function(p, i){ return '<div class="ph"><img src="' + (THUMBS[p.pid] || "") + '" alt=""><button type="button" class="rm" data-i="' + i + '" aria-label="Remove">&times;</button></div>'; }).join("") +
+    ((S.photos || []).length < 4 ? '<div class="add" id="fuAdd"><span class="big">+</span>Add photo</div>' : "");
+  var add = $("fuAdd"); if(add) add.addEventListener("click", function(){ pendingArea = "fu"; $("pfile").value = ""; $("pfile").click(); });
+  g.querySelectorAll(".rm").forEach(function(b){ b.addEventListener("click", function(){ var ph = S.photos.splice(Number(b.getAttribute("data-i")), 1)[0]; if(ph){ delete THUMBS[ph.pid]; OV.photoDrop(S.id + ":" + ph.pid); } renderFuPhotos(); persist(); bar(); }); });
+  bar();
+}
+
+/* Restore thumbnails for a draft that survived a reload. */
+function restoreThumbs(){
+  var all = [];
+  S.areas.forEach(function(a){ a.photos.forEach(function(p){ all.push(p); }); });
+  (S.photos || []).forEach(function(p){ all.push(p); });
+  return all.reduce(function(chain, p){ return chain.then(function(){ return OV.photoLoad(S.id + ":" + p.pid).then(function(d){ if(d) return OV.thumb(d, 240).then(function(t){ THUMBS[p.pid] = t; }); }); }); }, Promise.resolve());
+}
+
+/* ---------- unsent from an earlier session ---------- */
+var UNSENT = "cwOvUnsent";
+function unsentList(){ try { return JSON.parse(localStorage.getItem(UNSENT) || "[]"); } catch(e){ return []; } }
+function setUnsent(list){ try { localStorage.setItem(UNSENT, JSON.stringify(list)); } catch(e){} }
+function renderResume(){
+  var list = unsentList();
+  $("resume").innerHTML = list.length ? list.map(function(u){ return '<div class="note warn"><b>Photos still waiting to upload</b> for ' + esc(u.property) + ' on ' + esc(u.service_date) + ' (' + u.pending.length + ' left). <button type="button" class="btn sm dark" data-resume="' + esc(u.id) + '" style="margin-left:8px">Upload now</button></div>'; }).join("") : "";
+  $("resume").querySelectorAll("[data-resume]").forEach(function(b){ b.addEventListener("click", function(){ resumeUpload(b.getAttribute("data-resume"), b); }); });
+}
+function resumeUpload(id, btn){
+  var list = unsentList(); var u = list.filter(function(x){ return x.id === id; })[0]; if(!u) return;
+  btn.disabled = true; btn.textContent = "Uploading...";
+  var items = u.pending.slice();
+  items.reduce(function(chain, pid){ return chain.then(function(){ return OV.photoLoad(id + ":" + pid).then(function(d){ if(!d){ u.pending = u.pending.filter(function(x){ return x !== pid; }); return; } return OV.api("ov_photo_put", { id:id, pid:pid, data:d }).then(function(r){ if(r && r.ok){ u.pending = u.pending.filter(function(x){ return x !== pid; }); OV.photoDrop(id + ":" + pid); } }); }); }); }, Promise.resolve())
+    .then(function(){ setUnsent(u.pending.length ? list : list.filter(function(x){ return x.id !== id; })); renderResume(); })
+    .catch(function(){ setUnsent(list); renderResume(); });
+}
+renderResume();
+
+/* ---------- submit ---------- */
+function validateForm(){
+  if(!S.property) return "Pick the property.";
+  if(!S.service_date) return "Pick the date.";
+  if(!String(S.porter || "").trim()) return "Enter your name.";
+  var missing = S.areas.filter(function(a){ if(a.na) return false; var def = areaDef(a.key); return !def.photoOptional && a.photos.length < 1; });
+  if(missing.length) return "Add at least one photo for: " + missing.map(function(a){ return a.name; }).join(", ") + ".";
+  var nothing = S.areas.filter(function(a){ return !a.na && !a.tasks.some(function(t){ return t.done; }); });
+  if(nothing.length) return "No tasks are checked in: " + nothing.map(function(a){ return a.name; }).join(", ") + ". Check what you did, or mark the area Not today.";
+  if(!$("confirm").checked) return "Tick the confirmation box.";
+  return "";
+}
+$("submit").addEventListener("click", function(){
+  var e = validateForm(); $("ferr").textContent = e;
+  if(e){ $("ferr").scrollIntoView({ behavior:"smooth", block:"center" }); return; }
+  var btn = $("submit"); btn.disabled = true; btn.textContent = "Submitting...";
+  try { localStorage.setItem("cwOvPorter", S.porter); } catch(e2){}
+  var doc = JSON.parse(JSON.stringify(S));
+  doc.areas.forEach(function(a){ delete a._touched; a.photos.forEach(function(p){ delete p._mem; }); });
+  doc.submitted_at = new Date().toISOString();
+  var all = [];
+  doc.areas.forEach(function(a){ a.photos.forEach(function(p){ all.push({ pid:p.pid, area:a.name }); }); });
+  (doc.photos || []).forEach(function(p){ all.push({ pid:p.pid, area:"Follow-up" }); });
+  OV.api("ov_submit", { doc: doc }).then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.error) || "Could not submit");
+    var id = doc.id;
+    OV.clearDraft("checklist");
+    $("form").classList.add("hidden"); $("bar").classList.add("hidden"); $("doneWrap").classList.remove("hidden"); window.scrollTo(0, 0);
+    $("doneRef").textContent = id;
+    $("doneText").textContent = S.weekday + " checklist for " + S.property + " is in. Your Facility Solutions Manager reviews it and sends the report to the property.";
+    if(!all.length) return;
+    $("donePhotos").innerHTML = '<div class="note info" id="pstat">Uploading ' + all.length + ' photos. Keep this page open.</div><div class="progress"><i id="pbar"></i></div>';
+    var pending = all.map(function(p){ return p.pid; });
+    setUnsent(unsentList().concat([{ id:id, property:S.property, service_date:S.service_date, pending:pending }]));
+    return all.reduce(function(chain, p, i){
+      return chain.then(function(){
+        var mem = null; S.areas.forEach(function(a){ a.photos.forEach(function(x){ if(x.pid === p.pid && x._mem) mem = x._mem; }); });
+        return (mem ? Promise.resolve(mem) : OV.photoLoad(id + ":" + p.pid)).then(function(d){
+          if(!d) return;
+          return OV.api("ov_photo_put", { id:id, pid:p.pid, data:d }).then(function(rr){
+            if(rr && rr.ok){ pending = pending.filter(function(x){ return x !== p.pid; }); OV.photoDrop(id + ":" + p.pid); }
+          }).catch(function(){});
+        }).then(function(){ $("pbar").style.width = Math.round(((i + 1) / all.length) * 100) + "%"; $("pstat").textContent = "Uploading photo " + (i + 1) + " of " + all.length + "..."; });
+      });
+    }, Promise.resolve()).then(function(){
+      var list = unsentList().map(function(u){ if(u.id === id) u.pending = pending; return u; }).filter(function(u){ return u.pending.length; });
+      setUnsent(list);
+      $("pstat").className = "note " + (pending.length ? "warn" : "ok");
+      $("pstat").textContent = pending.length ? pending.length + " photo(s) did not upload. Open this page again on a good signal and tap Upload now." : "All photos uploaded. You are done.";
+    });
+  }).catch(function(err){
+    btn.disabled = false; btn.textContent = "Submit checklist";
+    var m = String(err && err.message || err);
+    if(/passcode/i.test(m)) return OV.locked(m);
+    $("ferr").textContent = /fetch|network|json/i.test(m) ? "Could not reach City Wide. Check your signal and tap Submit again. Nothing is lost." : m;
+  });
+});
+
+applyPropertyDefaults();
+restoreThumbs().then(function(){ renderAreas(); renderFuPhotos(); });
+renderAreas(); renderFuPhotos();
+})();
+</script>
+</body>
+</html>

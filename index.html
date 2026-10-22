@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Ovation Hub | City Wide Facility Solutions</title>
+<!-- build 2026-10-22: Ovation Hub landing page. Client-facing hub for Ovation Property Management
+     staff and the day porters on their properties. Own passcode (script property OV_PASSCODE, kind
+     ov_auth on the CW Team Portal Backend, Ovation.gs). The City Wide review queue (review.html)
+     is team passcode only. -->
+<link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="https://citywidelv.github.io/cw-ops-desk/apple-touch-icon.png">
+<link rel="stylesheet" href="ov.css">
+<style>
+.hero{background:var(--black);color:#fff;border-bottom:5px solid var(--red);padding:26px 0}
+.hero .in{max-width:860px;margin:0 auto;padding:0 16px}
+.hero .k{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#bdb9b3}
+.hero h1{color:#fff;font-size:1.5rem;margin:6px 0 4px}
+.hero p{color:#d8d5d1;font-size:14px;max-width:560px}
+.team{margin-top:22px;border:1px solid var(--border);border-left:5px solid var(--black);border-radius:10px;background:var(--white);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;text-decoration:none;color:var(--black)}
+.team b{font-size:13px}
+.team span{font-size:12px;color:var(--grey)}
+.team .go{margin-left:auto;font-weight:700;color:var(--red)}
+</style>
+<link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
+</head>
+<body>
+
+<div class="gate" id="gate">
+<div class="lockcard">
+<img src="https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png" alt="City Wide Facility Solutions">
+<h3>Ovation Hub</h3>
+<div class="for">For Ovation Property Management</div>
+<p>Enter the passcode City Wide gave your property team. This device stays signed in.</p>
+<input type="password" id="pc" placeholder="Passcode" autocomplete="current-password" autofocus>
+<button class="btn" id="enter">Enter</button>
+<div class="err" id="err"></div>
+<div class="hint">Need the passcode? Ask your City Wide Facility Solutions Manager or call 702-483-1874.</div>
+</div>
+</div>
+
+<div id="app" class="hidden">
+<header class="top">
+<div class="bar">
+<img src="https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png" alt="City Wide Facility Solutions">
+<div class="tag"><b>Ovation Hub</b>Ovation Property Management</div>
+</div>
+</header>
+
+<section class="hero">
+<div class="in">
+<div class="k">Day porter program</div>
+<h1>How can City Wide help today?</h1>
+<p>Report something you noticed, request extra work for your community, or complete today's porter checklist. Every entry goes straight to the City Wide team for your property.</p>
+</div>
+</section>
+
+<main class="wrap">
+<div class="tiles">
+<a class="tile" href="report.html">
+<div class="k">For Ovation staff</div>
+<h2>Report or Request</h2>
+<p>Send a compliment, flag something that needs attention, report a spill or hazard, or request carpet cleaning, floor care, window cleaning or a unit make-ready.</p>
+<div class="go">Start &rarr;</div>
+</a>
+<a class="tile black" href="checklist.html">
+<div class="k">For porters</div>
+<h2>Porter Daily Checklist</h2>
+<p>Today's checklist for your property, area by area, with photos. Takes a few minutes at the end of the shift.</p>
+<div class="go">Open the checklist &rarr;</div>
+</a>
+</div>
+
+<div class="note info"><b>Something urgent right now?</b> Call the City Wide Las Vegas service line at <a href="tel:7024831874">702-483-1874</a>. You can still log it here so there is a record.</div>
+
+<a class="team" href="review.html" id="teamlink"><b>City Wide team</b><span>Review queue: porter checklists and Ovation reports, build the PDF, send it to the property. Team passcode.</span><span class="go">Open &rarr;</span></a>
+</main>
+
+<footer class="foot">City Wide Facility Solutions | Las Vegas &middot; 3215 W Charleston Blvd, Suite 130, Las Vegas, NV 89102 &middot; <a href="tel:7024831874">702-483-1874</a></footer>
+</div>
+
+<script src="ov-shared.js"></script>
+<script>
+OV.hubGate({ input:"pc", button:"enter", err:"err", gate:"gate", app:"app", onUnlock:function(){
+  /* The team link is for City Wide staff; it stays visible so an FSM can get in, but it
+     carries nothing a client could use (review.html bounces to the Ops Hub gate). */
+}});
+</script>
+</body>
+</html>
