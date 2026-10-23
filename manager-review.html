@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Checklists and Reports | Manager Desk</title>
+<!-- build 2026-10-23: Manager Desk review page. Lists the porters' daily checklists and every report
+     (kind ov_mgr_list), opens one read-only (ov_mgr_get, photos through ov_mgr_photo) and lets the manager
+     approve a checklist (ov_mgr_approve: status Reviewed, clears the Ops Hub Alerts card). A coverage strip
+     shows which awarded properties have a checklist in today. Nothing here sends to the property and no
+     Ovation contact details are returned by the backend. Manager passcode (OV.mgrRequire). -->
+<link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
+<link rel="stylesheet" href="ov.css">
+<style>
+body{background:var(--light)}
+main.wrap{max-width:1180px;padding-bottom:40px}
+header.top .bar{max-width:1180px;gap:18px}
+header.top .bar .back{flex:none;white-space:nowrap}
+header.top .bar .back + .brands{flex:none}
+header.top .tag{flex:1;min-width:0}
+.tabs{display:flex;gap:6px;margin:6px 0 12px;flex-wrap:wrap}
+.tabs .chip{border-radius:10px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.filters select{width:auto;min-width:160px;min-height:40px;padding:8px 36px 8px 10px;font-size:14px}
+.filters .btn{width:auto}
+.cover{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.cover .c{font-size:12px;font-weight:700;border-radius:999px;padding:6px 11px;border:1.5px solid var(--border);background:#fff;color:var(--grey)}
+.cover .c.in{border-color:#bfe3cc;background:var(--okbg);color:var(--ok)}
+.cover .c.out{border-color:#f0c4c6;background:var(--warnbg);color:var(--red)}
+.cover .lbl{font-size:12px;color:var(--grey);align-self:center;margin-right:4px}
+.layout{display:grid;grid-template-columns:380px 1fr;gap:16px;align-items:start}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.list{background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.item{display:block;width:100%;text-align:left;background:var(--white);border:0;border-bottom:1px solid var(--light);padding:12px 14px;cursor:pointer;font-family:inherit;color:var(--black)}
+.item:hover{background:#faf7f5}
+.item.on{background:#fdf3f3;border-left:4px solid var(--red)}
+.item b{display:block;font-size:14px}
+.item .m{font-size:12px;color:var(--grey);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.empty{padding:24px;text-align:center;color:var(--grey);font-size:13px}
+.detail .head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start;margin-bottom:10px}
+.detail h2{font-size:1.2rem;margin:0}
+.detail .meta{font-size:13px;color:var(--grey)}
+.approve{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;margin:12px 0}
+.approve .field{margin:0;flex:1;min-width:200px}
+.approve .btn{width:auto;min-height:44px}
+.approve .done{font-size:13px;color:var(--ok);font-weight:700}
+.rarea{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;background:var(--white)}
+.rarea .rh{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--light)}
+.rarea .rh b{flex:1;font-size:14px}
+.rarea .rh .st{font-size:12px;color:var(--grey)}
+.rarea .rh .st.bad{color:var(--red);font-weight:700}
+.rarea .rb{display:grid;grid-template-columns:1fr 220px;gap:10px;padding:10px 12px}
+@media(max-width:700px){.rarea .rb{grid-template-columns:1fr}}
+.rarea .t{display:flex;gap:8px;padding:5px 2px;font-size:13px;border-bottom:1px solid var(--light);line-height:1.3}
+.rarea .t .k{flex:none;width:62px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ok);padding-top:2px}
+.rarea .t.no .k{color:var(--red)}
+.rarea .grp{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--grey);margin:8px 0 2px}
+.rarea .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.rarea .ph{position:relative;aspect-ratio:1;background:var(--light);border-radius:8px;overflow:hidden;border:1px solid var(--border);cursor:zoom-in}
+.rarea .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.rarea .ph .ld{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--grey)}
+.qa{display:grid;grid-template-columns:200px 1fr;gap:6px 14px;font-size:14px}
+.qa dt{color:var(--grey);font-size:13px}
+.qa dd{font-weight:700}
+@media(max-width:600px){.qa{grid-template-columns:1fr}}
+.light{position:fixed;inset:0;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;z-index:60;cursor:zoom-out}
+.light img{max-width:96vw;max-height:94vh;border-radius:6px}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--black);color:#fff;font-size:13px;font-weight:700;padding:10px 16px;border-radius:999px;z-index:70;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.backlist{display:none}
+@media(max-width:600px){
+  header.top .brands{display:none}
+  .tabs .chip{flex:1 1 40%;text-align:center;justify-content:center}
+  .filters select{flex:1 1 40%;min-height:44px;font-size:16px}
+  .layout.open .list{display:none}
+  .backlist{display:inline-flex;align-items:center;min-height:44px;font-size:14px;font-weight:700;color:var(--black);text-decoration:none;margin-bottom:6px}
+  .rarea .pgrid{grid-template-columns:repeat(3,1fr)}
+}
+</style>
+<link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
+</head>
+<body>
+<header class="top">
+<div class="bar">
+<a class="back" href="manager.html">&larr; Manager Desk</a>
+<div class="brands"><img class="cw" src="https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png" alt="City Wide Facility Solutions"><span class="div"></span><img class="ovl" src="ovation-logo.svg" alt="Ovation Property Management"></div>
+<div class="tag"><b>Checklists and Reports</b>Manager Desk</div>
+</div>
+</header>
+
+<main class="wrap">
+<div class="tabs" id="tabs">
+<button type="button" class="chip on" data-t="checklist">Daily checklists</button>
+<button type="button" class="chip" data-t="report">Reports &amp; requests</button>
+</div>
+<div class="cover" id="cover"></div>
+<div class="filters">
+<select id="fstatus"><option value="New">Waiting for approval</option><option value="">All</option><option value="Reviewed">Approved / reviewed</option><option value="Sent">Sent to the property</option></select>
+<select id="fprop"><option value="">All properties</option></select>
+<button type="button" class="btn ghost sm" id="refresh">Refresh</button>
+<span id="count" style="font-size:12px;color:var(--grey)"></span>
+</div>
+
+<div class="layout">
+<div class="list" id="list"><div class="empty">Loading...</div></div>
+<div class="detail" id="detail"><div class="card plain"><div class="empty">Pick an item to open it.</div></div></div>
+</div>
+</main>
+
+<script src="ov-shared.js"></script>
+<script>
+(function(){
+var $ = OV.$, esc = OV.esc;
+if(!OV.mgrRequire()) return;
+var api = function(kind, body){ return OV.mgrApi(kind, body || {}).then(function(r){ if(r && r.ok === false && /passcode/i.test(String(r.error || ""))) { OV.mgrLocked(r.error); throw new Error(r.error); } return r; }); };
+var P = OV.params();
+var S = { type: P.t === "report" ? "report" : "checklist", data:null, cur:null, doc:null, index:null, files:{}, photos:{} };
+function myName(){ try { return localStorage.getItem("cwOvMgrName") || ""; } catch(e){ return ""; } }
+$("fprop").innerHTML = '<option value="">All properties</option>' + OV.PROPERTIES.map(function(p){ return '<option>' + esc(p.name) + '</option>'; }).join("");
+if(S.type === "report"){ $("tabs").querySelectorAll(".chip[data-t]").forEach(function(x){ x.classList.toggle("on", x.getAttribute("data-t") === "report"); }); $("fstatus").value = ""; }
+if(P.id) $("fstatus").value = "";
+
+function toast(m, bad){ var t = document.createElement("div"); t.className = "toast"; if(bad) t.style.background = "#D22730"; t.textContent = m; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 2800); }
+function pill(st){ var s = String(st || "New"); var label = s === "New" ? (S.type === "checklist" ? "To approve" : "New") : s === "Reviewed" ? (S.type === "checklist" ? "Approved" : "Reviewed") : s; return '<span class="pill ' + esc(s.toLowerCase()) + '">' + esc(label) + '</span>'; }
+
+/* ---------- list ---------- */
+function load(){
+  $("list").innerHTML = '<div class="empty">Loading...</div>';
+  api("ov_mgr_list").then(function(r){
+    if(!r.ok) throw new Error(r.error);
+    S.data = r; paintCover(); paintList();
+    if(P.id && !S.cur){ openItem(P.id); P.id = ""; }
+  }).catch(function(e){ $("list").innerHTML = '<div class="empty">' + esc(e.message || e) + '</div>'; });
+}
+function rows(){
+  if(!S.data) return [];
+  var list = S.type === "checklist" ? S.data.checklists : S.data.reports;
+  var st = $("fstatus").value, pr = $("fprop").value;
+  return list.filter(function(r){
+    if(st && String(r.status || "New") !== st) return false;
+    if(pr && String(r.property) !== pr) return false;
+    return true;
+  });
+}
+/* Which awarded properties have a checklist in for today. Live-service properties only. */
+function paintCover(){
+  var el = $("cover");
+  if(S.type !== "checklist" || !S.data){ el.innerHTML = ""; return; }
+  var today = S.data.today;
+  var live = (S.data.properties || []).filter(function(p){ var started = p.start && String(p.start).slice(0, 10) <= today; return String(p.awarded).toUpperCase() === "Y" && started; });
+  if(!live.length){ el.innerHTML = ""; return; }
+  var have = {}; S.data.checklists.forEach(function(c){ if(String(c.service_date) === today) have[c.property] = true; });
+  el.innerHTML = '<span class="lbl">Today:</span>' + live.map(function(p){ return '<span class="c ' + (have[p.property] ? 'in' : 'out') + '">' + esc(p.property) + (have[p.property] ? ' &#10003;' : ' no checklist yet') + '</span>'; }).join("");
+}
+function paintList(){
+  var list = rows();
+  $("count").textContent = list.length + " item" + (list.length === 1 ? "" : "s");
+  if(!list.length){ $("list").innerHTML = '<div class="empty">Nothing here. Change the filter to see more.</div>'; return; }
+  $("list").innerHTML = list.map(function(r){
+    var m = S.type === "checklist"
+      ? [esc(r.weekday) + " " + esc(r.service_date), esc(r.porter), r.areas_done + " areas", r.photos + " photos"]
+      : [OV.fmtDate(r.created_at), esc(r.mode) + (r.category ? " · " + esc(r.category) : ""), r.urgency && /emergency/i.test(r.urgency) ? "<b style='color:var(--red)'>EMERGENCY</b>" : (r.urgency ? "<b>" + esc(r.urgency) + "</b>" : "")];
+    return '<button type="button" class="item' + (S.cur === r.id ? ' on' : '') + '" data-id="' + esc(r.id) + '"><b>' + esc(r.property) + '</b><div class="m">' + pill(r.status) + m.filter(Boolean).map(function(x){ return '<span>' + x + '</span>'; }).join("") + '</div>' + (S.type === "report" && r.summary ? '<div class="m" style="color:var(--black)">' + esc(String(r.summary).slice(0, 110)) + '</div>' : '') + '</button>';
+  }).join("");
+  $("list").querySelectorAll(".item").forEach(function(b){ b.addEventListener("click", function(){ openItem(b.getAttribute("data-id")); }); });
+}
+$("tabs").querySelectorAll(".chip[data-t]").forEach(function(b){ b.addEventListener("click", function(){
+  S.type = b.getAttribute("data-t"); $("tabs").querySelectorAll(".chip[data-t]").forEach(function(x){ x.classList.toggle("on", x === b); });
+  $("fstatus").value = S.type === "checklist" ? "New" : "";
+  S.cur = null; $("detail").innerHTML = '<div class="card plain"><div class="empty">Pick an item to open it.</div></div>'; document.querySelector(".layout").classList.remove("open");
+  paintCover(); paintList();
+}); });
+$("fstatus").addEventListener("change", paintList); $("fprop").addEventListener("change", paintList); $("refresh").addEventListener("click", load);
+
+/* ---------- detail (read only, plus Approve on a checklist) ---------- */
+function openItem(id){
+  S.cur = id; S.photos = {};
+  paintList();
+  $("detail").innerHTML = '<div class="card plain"><div class="empty">Loading...</div></div>';
+  document.querySelector(".layout").classList.add("open");
+  if(window.innerWidth <= 900) window.scrollTo({ top:0, behavior:"smooth" });
+  api("ov_mgr_get", { id:id }).then(function(r){
+    if(!r.ok) throw new Error(r.error);
+    S.doc = r.doc; S.index = r.index; S.files = r.photo_files || {}; S.type = r.type;
+    paintDetail();
+  }).catch(function(e){ document.querySelector(".layout").classList.remove("open"); $("detail").innerHTML = '<div class="card plain"><div class="empty">' + esc(e.message || e) + '</div></div>'; });
+}
+function status(){ return S.doc.status || S.index.status || "New"; }
+function paintDetail(){
+  var d = S.doc, isCheck = S.type === "checklist";
+  var h = '<a href="#" class="backlist" id="backList">&larr; Back to the list</a><div class="card plain detail">';
+  h += '<div class="head"><div><h2>' + esc(d.property) + '</h2><div class="meta">' + (isCheck
+      ? esc(d.weekday) + ", " + esc(d.service_date) + " · Porter: <b>" + esc(d.porter) + "</b>" + (d.shift_start ? " · " + esc(d.shift_start) + (d.shift_end ? " to " + esc(d.shift_end) : "") : "") + " · submitted " + esc(OV.fmtDate(d.submitted_at || d.created_at))
+      : esc(d.mode) + " · " + esc(d.category) + (d.subcategory ? " · " + esc(d.subcategory) : "") + " · from <b>" + esc(d.submitter) + "</b>" + (d.role ? " (" + esc(d.role) + ")" : "") + " · " + esc(OV.fmtDate(d.created_at))) +
+    '</div></div><div>' + pill(status()) + (d.reviewed_by ? '<div class="meta" style="margin-top:4px">' + (isCheck ? 'Approved' : 'Reviewed') + ' by ' + esc(d.reviewed_by) + (d.reviewed_at ? ' · ' + esc(OV.fmtDate(d.reviewed_at)) : '') + '</div>' : '') + '</div></div>';
+  if(isCheck){
+    h += status() === "New"
+      ? '<div class="approve"><div class="field"><label>Your name</label><input type="text" id="apBy" value="' + esc(myName()) + '" placeholder="First and last name"></div><div class="field"><label>Note for City Wide (optional)</label><input type="text" id="apNote" placeholder="Anything City Wide should know about this day"></div><button type="button" class="btn" id="bApprove">Approve this checklist</button></div>'
+      : '<div class="approve"><span class="done">&#10003; ' + (status() === "Sent" ? "Approved and already sent to the property by City Wide." : "Approved. City Wide will send it to the property.") + '</span>' + (d.manager_note ? '<span class="meta">Your note: ' + esc(d.manager_note) + '</span>' : '') + '</div>';
+  }
+  h += '</div>';
+  if(isCheck){
+    var passes = (d.passes || []).filter(function(p){ return p.done; });
+    if(passes.length) h += '<div class="card plain"><h2 style="font-size:1rem">Passes done</h2><div class="meta">' + passes.map(function(p){ return esc(p.t); }).join(" · ") + '</div></div>';
+    (d.areas || []).forEach(function(a){
+      var daily = a.tasks.filter(function(t){ return t.f === "daily"; }), done = daily.filter(function(t){ return t.done; }).length, missed = daily.length - done;
+      h += '<div class="rarea"><div class="rh"><b>' + esc(a.name) + '</b><span class="st' + (!a.na && missed ? ' bad' : '') + '">' + (a.na ? "Not serviced" : done + "/" + daily.length + (missed ? " · " + missed + " not done" : "") + " · " + a.photos.length + " photo" + (a.photos.length === 1 ? "" : "s")) + '</span></div>';
+      if(!a.na){
+        h += '<div class="rb"><div>';
+        ["daily","weekly","monthly"].forEach(function(f){
+          var list = a.tasks.filter(function(t){ return t.f === f && (f === "daily" || t.done); });
+          if(!list.length) return;
+          h += '<div class="grp">' + (f === "daily" ? "Each shift" : f === "weekly" ? "Weekly tasks done" : "Monthly tasks done") + '</div>';
+          list.forEach(function(t){ h += '<div class="t' + (t.done ? '' : ' no') + '"><span class="k">' + (t.done ? "Done" : "Not done") + '</span><span>' + esc(t.t) + '</span></div>'; });
+        });
+        if(a.floors) h += '<div class="meta" style="font-size:13px;margin-top:6px">Floors: <b>' + esc(a.floors) + '</b></div>';
+        if(a.note) h += '<div class="meta" style="font-size:13px;margin-top:6px">Porter note: ' + esc(a.note) + '</div>';
+        h += '</div><div><div class="pgrid">' + a.photos.map(function(p){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div></div>'; }).join("") + '</div></div></div>';
+      }
+      h += '</div>';
+    });
+    if(d.followups || (d.followup_tags || []).length || (d.photos || []).length || d.supplies){
+      h += '<div class="card plain">';
+      if(d.followups || (d.followup_tags || []).length || (d.photos || []).length) h += '<h2 style="font-size:1rem">Reported to the property</h2>' + ((d.followup_tags || []).length ? '<div class="meta">' + d.followup_tags.map(esc).join(" · ") + '</div>' : '') + (d.followups ? '<p style="font-size:14px">' + esc(d.followups) + '</p>' : '') + ((d.photos || []).length ? '<div class="rarea" style="border:0"><div class="pgrid" style="grid-template-columns:repeat(4,1fr)">' + d.photos.map(function(p){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div></div>'; }).join("") + '</div></div>' : '');
+      if(d.supplies) h += '<h2 style="font-size:1rem;margin-top:14px">Supplies running low</h2><p style="font-size:14px">' + esc(d.supplies) + '</p>';
+      h += '</div>';
+    }
+    if(d.fsm_notes) h += '<div class="note info"><b>Note City Wide added for the property:</b> ' + esc(d.fsm_notes) + '</div>';
+  } else {
+    h += '<div class="card plain"><dl class="qa">';
+    [["Property", d.property], ["From", d.submitter + (d.role ? " (" + d.role + ")" : "")], ["Type", d.mode], ["Category", d.category], ["Where", d.location], ["Urgency", d.urgency]].forEach(function(f){ if(f[1]) h += '<dt>' + esc(f[0]) + '</dt><dd>' + esc(f[1]) + '</dd>'; });
+    (d.answers || []).forEach(function(a){ var v = Array.isArray(a.a) ? a.a.join(", ") : a.a; if(v) h += '<dt>' + esc(a.q) + '</dt><dd>' + esc(v) + '</dd>'; });
+    if(d.notes) h += '<dt>Anything else</dt><dd>' + esc(d.notes) + '</dd>';
+    h += '</dl>';
+    if((d.photos || []).length) h += '<div class="rarea" style="margin-top:12px;border:0"><div class="pgrid" style="grid-template-columns:repeat(4,1fr)">' + d.photos.map(function(p){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div></div>'; }).join("") + '</div></div>';
+    if(d.response) h += '<div class="note ok" style="margin-top:14px"><b>City Wide response:</b> ' + esc(d.response) + '</div>';
+    h += '</div>';
+  }
+  $("detail").innerHTML = h;
+  var bl = $("backList"); if(bl) bl.addEventListener("click", function(e){ e.preventDefault(); document.querySelector(".layout").classList.remove("open"); S.cur = null; paintList(); $("detail").innerHTML = '<div class="card plain"><div class="empty">Pick an item to open it.</div></div>'; window.scrollTo({ top:0, behavior:"smooth" }); });
+  var ap = $("bApprove"); if(ap) ap.addEventListener("click", approve);
+  $("detail").querySelectorAll(".ph").forEach(function(el){ el.addEventListener("click", function(){ var pid = el.getAttribute("data-pid"); if(S.photos[pid]) lightbox(S.photos[pid]); }); });
+  loadPhotos();
+}
+function approve(){
+  var by = $("apBy").value.trim();
+  if(!by){ toast("Enter your name first", true); $("apBy").focus(); return; }
+  try { localStorage.setItem("cwOvMgrName", by); } catch(e){}
+  var b = $("bApprove"); b.disabled = true; b.textContent = "Approving...";
+  api("ov_mgr_approve", { id:S.doc.id, by:by, note:$("apNote").value }).then(function(r){
+    if(!r.ok) throw new Error(r.error);
+    S.doc.status = r.status; S.doc.reviewed_by = r.by || (by + " (site manager)"); S.doc.reviewed_at = r.at; S.doc.manager_note = $("apNote").value;
+    var row = (S.data.checklists || []).filter(function(x){ return x.id === S.doc.id; })[0]; if(row) row.status = r.status;
+    toast(r.already ? "Already approved" : "Approved"); paintDetail(); paintList();
+  }).catch(function(e){ b.disabled = false; b.textContent = "Approve this checklist"; toast(e.message || String(e), true); });
+}
+function lightbox(src){ var l = document.createElement("div"); l.className = "light"; l.innerHTML = '<img src="' + src + '" alt="">'; l.addEventListener("click", function(){ l.remove(); }); document.body.appendChild(l); }
+function loadPhotos(){
+  var pids = []; document.querySelectorAll("#detail .ph[data-pid]").forEach(function(el){ pids.push(el.getAttribute("data-pid")); });
+  pids.reduce(function(chain, pid){ return chain.then(function(){
+    if(S.photos[pid]) return place(pid);
+    var fid = S.files[pid]; if(!fid){ place(pid, true); return; }
+    return api("ov_mgr_photo", { fileId:fid }).then(function(r){ if(r.ok) S.photos[pid] = r.data; place(pid, !r.ok); }).catch(function(){ place(pid, true); });
+  }); }, Promise.resolve());
+}
+function place(pid, missing){
+  document.querySelectorAll('#detail .ph[data-pid="' + pid + '"]').forEach(function(el){
+    var ld = el.querySelector(".ld");
+    if(missing){ if(ld) ld.textContent = "not uploaded"; return; }
+    if(ld) ld.remove();
+    if(!el.querySelector("img")){ var img = document.createElement("img"); img.src = S.photos[pid]; el.appendChild(img); }
+  });
+}
+load();
+})();
+</script>
+</body>
+</html>

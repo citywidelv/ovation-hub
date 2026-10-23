@@ -1,4 +1,5 @@
-/* Ovation Hub shared layer. Build 2026-10-22b (client passcode only; porter pages).
+/* Ovation Hub shared layer. Build 2026-10-23 (Manager Desk gate added: mgrGate / mgrRequire / mgrApi, key cwOvationMgrPass).
+   Build 2026-10-22b (client passcode only; porter pages).
    citywidelv.github.io/ovation-hub/ is a client-facing hub for Ovation Property Management
    staff and the day porters on their properties. Its passcode is its own (script property
    OV_PASSCODE on the CW Team Portal Backend), checked server side by kind ov_auth. The team
@@ -215,6 +216,62 @@
     alert(msg);
   }
 
+  /* ---------- Manager Desk gate (Oct 23 2026) ----------
+     Third tier. The porter vendor's site manager holds this passcode (script property
+     OV_MGR_PASSCODE, kind ov_mgr_auth). It opens manager.html and its pages only. It never
+     opens the Ops Hub or the team review queue, and the client / team codes do not open it. */
+  var MGRKEY = "cwOvationMgrPass", MGRSTAMP = "cwOvationMgrSince", MGRHUB = HUB + "manager.html";
+  function mgrTouch(){ ls(function(){ localStorage.setItem(MGRSTAMP, String(Date.now())); }); }
+  function mgrGetPass(){
+    var v = ls(function(){ return localStorage.getItem(MGRKEY); }) || "";
+    var t = Number(ls(function(){ return localStorage.getItem(MGRSTAMP); }) || 0);
+    if(v && t && Date.now() - t > MAXAGE){ mgrClearPass(); return ""; }
+    if(v) mgrTouch();
+    return v;
+  }
+  function mgrSetPass(p){ ls(function(){ localStorage.setItem(MGRKEY, p); }); mgrTouch(); }
+  function mgrClearPass(){ ls(function(){ localStorage.removeItem(MGRKEY); localStorage.removeItem(MGRSTAMP); }); }
+  function mgrApi(kind, body){ body = body || {}; body.kind = kind; body.passcode = mgrGetPass(); return post(body); }
+  function mgrValidate(pass){
+    return post({ kind:"ov_mgr_auth", passcode: pass })
+      .then(function(r){ if(r && r.ok === true) return { ok:true, r:r }; return { ok:false, r:r }; })
+      .catch(function(){ return { ok:null }; });
+  }
+  function mgrGate(opts){
+    var p = params();
+    var next = p.next && p.next.indexOf(HUB + "manager") === 0 ? p.next : "";
+    var input = $(opts.input), button = $(opts.button), err = $(opts.err), gate = $(opts.gate), app = $(opts.app);
+    function say(m){ if(err) err.textContent = m || ""; }
+    function open(){ if(next){ location.replace(next); return; } if(gate) gate.classList.add("hidden"); if(app) app.classList.remove("hidden"); if(opts.onUnlock) opts.onUnlock(); }
+    function submit(){
+      var v = input ? String(input.value || "").trim() : "";
+      if(!v){ say("Enter the passcode."); return; }
+      button.disabled = true; button.textContent = "Checking...";
+      mgrValidate(v).then(function(res){
+        button.disabled = false; button.textContent = "Enter";
+        if(res.ok === true){ mgrSetPass(v); open(); }
+        else if(res.ok === null) say("Could not reach the server. Check your connection and try again.");
+        else { say((res.r && res.r.error && !/wrong/i.test(res.r.error)) ? res.r.error : "That passcode is not right. Ask your City Wide Facility Solutions Manager."); input.value = ""; input.focus(); }
+      });
+    }
+    if(button) button.addEventListener("click", function(e){ e.preventDefault(); submit(); });
+    if(input) input.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); submit(); } });
+    var cached = mgrGetPass();
+    if(cached){
+      if(next){ mgrValidate(cached).then(function(res){ if(res.ok === true || res.ok === null) open(); else { mgrClearPass(); if(input) input.focus(); } }); }
+      else { open(); mgrValidate(cached).then(function(res){ if(res.ok === false){ mgrClearPass(); location.reload(); } }); }
+    } else if(input) input.focus();
+  }
+  function mgrRequire(){
+    var pass = mgrGetPass();
+    if(!pass){ location.replace(MGRHUB + "?next=" + encodeURIComponent(location.href)); return ""; }
+    return pass;
+  }
+  function mgrLocked(msg){
+    if(!msg || /passcode/i.test(String(msg))){ mgrClearPass(); location.replace(MGRHUB + "?next=" + encodeURIComponent(location.href)); return; }
+    alert(msg);
+  }
+
   /* ---------- photos ---------- */
   /* Shrinks a camera photo to a JPEG at most `max` px on the long side. Fixes EXIF rotation
      where the browser supports it. Resolves { data, w, h }. */
@@ -322,6 +379,7 @@
   window.OV = { WEBHOOK:WEBHOOK, porterProp:porterProp, openPdf:openPdf, HUB:HUB, LOGO:LOGO, PROPERTIES:PROPERTIES, GROUPS:GROUPS, AREAS:AREAS, PASSES:PASSES,
     esc:esc, uid:uid, $:$, params:params, byName:byName, awarded:awarded, propertyOptions:propertyOptions,
     getPass:getPass, setPass:setPass, clearPass:clearPass, isTeam:isTeam, post:post, api:api, validate:validate, hubGate:hubGate, require:require, locked:locked,
+    mgrGate:mgrGate, mgrRequire:mgrRequire, mgrApi:mgrApi, mgrLocked:mgrLocked, mgrGetPass:mgrGetPass, mgrClearPass:mgrClearPass, MGRHUB:MGRHUB,
     shrink:shrink, thumb:thumb, uploadPhotos:uploadPhotos, saveDraft:saveDraft, loadDraft:loadDraft, clearDraft:clearDraft,
     photoStore:photoStore, photoLoad:photoLoad, photoDrop:photoDrop, fmtDate:fmtDate, weekday:weekday, today:today };
 })();

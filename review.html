@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Ovation Review Queue | City Wide</title>
-<!-- build 2026-10-23: Create a weekly digest button (digest.html). Status filter gained Scheduled and Done, the statuses the Ops Hub Alerts card can set on a report.
+<!-- build 2026-10-23b: header shows who approved or reviewed an item (site manager approvals from the Manager Desk included).
+     build 2026-10-23: Create a weekly digest button (digest.html). Status filter gained Scheduled and Done, the statuses the Ops Hub Alerts card can set on a report.
      build 2026-10-22d: header laid out on one row at the page width (back link, logos, title, name box) so nothing overlaps.
      build 2026-10-22c: co-brand. Ovation logo beside City Wide in the header and on the PDF band.
      build 2026-10-22b: phone pass. Under 600px the list hides while an item is open (Back to the list link), 44px rows, name box on its own row.
@@ -205,7 +206,7 @@ function paintDetail(){
   h += '<div class="head"><div><h2>' + esc(d.property) + '</h2><div class="meta">' + (isCheck
       ? esc(d.weekday) + ", " + esc(d.service_date) + " · Porter: <b>" + esc(d.porter) + "</b>" + (d.shift_start ? " · " + esc(d.shift_start) + (d.shift_end ? " to " + esc(d.shift_end) : "") : "") + " · submitted " + esc(OV.fmtDate(d.submitted_at || d.created_at))
       : esc(d.mode) + " · " + esc(d.category) + (d.subcategory ? " · " + esc(d.subcategory) : "") + " · from <b>" + esc(d.submitter) + "</b> (" + esc(d.role) + ") · " + esc(OV.fmtDate(d.created_at))) +
-    '</div></div><div>' + pill(status()) + (S.index.sent_to ? '<div class="meta" style="margin-top:4px">Sent ' + esc(OV.fmtDate(S.index.sent_at)) + ' to ' + esc(S.index.sent_to) + '</div>' : '') + '</div></div>';
+    '</div></div><div>' + pill(status()) + (d.reviewed_by ? '<div class="meta" style="margin-top:4px">' + (d.approved_by_manager ? 'Approved' : 'Reviewed') + ' by ' + esc(d.reviewed_by) + (d.manager_note ? ' · "' + esc(d.manager_note) + '"' : '') + '</div>' : '') + (S.index.sent_to ? '<div class="meta" style="margin-top:4px">Sent ' + esc(OV.fmtDate(S.index.sent_at)) + ' to ' + esc(S.index.sent_to) + '</div>' : '') + '</div></div>';
   h += '<div class="actions"><button type="button" class="btn ghost" id="bSave">Save edits</button><button type="button" class="btn dark" id="bPdf">Build PDF</button><button type="button" class="btn" id="bSend">Send to property</button>' +
     (status() === "New" ? '<button type="button" class="btn ghost" id="bRev">Mark reviewed</button>' : '') +
     (S.pdfUrl ? '<a class="btn ghost" href="' + esc(S.pdfUrl) + '" target="_blank" rel="noopener">Last PDF</a>' : '') + '</div>';
