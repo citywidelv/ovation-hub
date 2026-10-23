@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Weekly Digest | Ovation Review Queue</title>
+<!-- build 2026-10-23: Weekly digest to the property. Lists every porter checklist and report not yet sent
+     (kind ov_digest_list), grouped by property with the date in large type so nothing gets ticked by mistake.
+     The FSM ticks the ones to send, checks the To / CC / reply-to (Properties tab), and sends one email per
+     property (kind ov_digest_send): HTML summary plus one PDF per item. PDFs the FSM never built are built
+     on the server and filed like the browser ones. Team passcode (CWAuth.require, Ops Hub gate). -->
+<link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
+<link rel="stylesheet" href="ov.css">
+<style>
+body{background:var(--light)}
+main.wrap{max-width:1020px;padding-bottom:120px}
+header.top .bar{max-width:1020px;gap:18px}
+header.top .bar .back{flex:none;white-space:nowrap}
+header.top .bar .back + .brands{flex:none}
+header.top .tag{flex:1;min-width:0}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--grey);flex:none}
+.who input{width:170px;min-height:36px;padding:6px 10px;font-size:14px}
+.top-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 14px}
+.top-actions .btn{width:auto;min-height:42px;padding:10px 14px;font-size:14px}
+.top-actions .cnt{font-size:13px;color:var(--grey)}
+.prop{background:var(--white);border:1px solid var(--border);border-radius:14px;margin-bottom:16px;overflow:hidden}
+.prop .ph{display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid var(--light);background:#fff;flex-wrap:wrap}
+.prop .ph .name{font-size:20px;font-weight:700;line-height:1.2;flex:1;min-width:200px}
+.prop .ph .name small{display:block;font-size:12px;font-weight:400;color:var(--grey);margin-top:2px}
+.prop .ph label.all{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:700;cursor:pointer;min-height:40px;padding:0 10px;border:1.5px solid var(--border);border-radius:10px;background:#fff}
+.prop .ph label.all input{width:20px;height:20px;accent-color:var(--red)}
+.prop .ph .sel{font-size:13px;color:var(--grey);min-width:90px}
+.prop .ph .sel b{color:var(--red);font-size:18px}
+.row{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--light);cursor:pointer;min-height:64px}
+.row:hover{background:#fcfaf8}
+.row.on{background:#fdf3f3}
+.row.sent{opacity:.55;cursor:default;background:var(--okbg)}
+.row input{flex:none;width:24px;height:24px;accent-color:var(--red)}
+.row .date{flex:none;width:200px;font-size:16px;font-weight:700;line-height:1.2}
+.row .date small{display:block;font-size:12px;font-weight:400;color:var(--grey)}
+.row .d{flex:1;min-width:0;font-size:13px;color:var(--grey);line-height:1.4}
+.row .d b{color:var(--black)}
+.row .pdf{flex:none;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:999px;padding:3px 9px;background:var(--light);color:var(--grey)}
+.row .pdf.yes{background:var(--okbg);color:var(--ok)}
+.row .pdf.em{background:var(--warnbg);color:var(--red)}
+.row .open{flex:none;font-size:12px;color:var(--grey);text-decoration:none}
+.sec{padding:8px 18px 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--grey);background:#fafafa;border-bottom:1px solid var(--light)}
+.send{padding:14px 18px;background:#fafafa;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:end}
+.send .field{margin:0}
+.send .field label{font-size:12px}
+.send .field input{min-height:40px;font-size:14px;padding:8px 10px}
+.send .act{grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.send .act .btn{width:auto;min-height:44px;padding:10px 18px;font-size:14px}
+.send .act .msg{font-size:13px;color:var(--grey);flex:1}
+.send .act .msg.bad{color:var(--red);font-weight:700}
+.send .act .msg.ok{color:var(--ok);font-weight:700}
+.send .act label.rem{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--grey)}
+.send details{grid-column:1/-1;font-size:13px}
+.send details summary{cursor:pointer;color:var(--grey);font-weight:700;font-size:12px}
+.send details .field{margin-top:8px}
+.send details textarea{min-height:120px;font-size:13px}
+.empty{padding:40px 20px;text-align:center;color:var(--grey);font-size:14px;background:var(--white);border:1px dashed var(--border);border-radius:14px}
+.skel{height:14px;border-radius:7px;background:linear-gradient(90deg,#eee,#f7f7f7,#eee);background-size:200% 100%;animation:sk 1.1s infinite}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--black);color:#fff;font-size:13px;font-weight:700;padding:10px 16px;border-radius:999px;z-index:70;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+@media(max-width:700px){
+  header.top .brands{display:none}
+  header.top .bar{flex-wrap:wrap}
+  .who{width:100%;order:3}
+  .who input{flex:1;min-height:44px;font-size:16px}
+  .row{flex-wrap:wrap;gap:8px 12px}
+  .row .date{width:auto;flex:1}
+  .row .d{flex-basis:100%;padding-left:36px}
+  .send{grid-template-columns:1fr}
+  .send .field input{min-height:44px;font-size:16px}
+}
+</style>
+<link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
+</head>
+<body>
+<header class="top">
+<div class="bar">
+<a class="back" href="review.html">&larr; Review Queue</a>
+<div class="brands"><img class="cw" src="https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png" alt="City Wide Facility Solutions"><span class="div"></span><img class="ovl" src="ovation-logo.svg" alt="Ovation Property Management"></div>
+<div class="tag"><b>Weekly Digest</b>Unsent reports, by property</div>
+<div class="who"><span>You:</span><input type="text" id="me" placeholder="Your name"></div>
+</div>
+</header>
+
+<main class="wrap">
+<h1>Create a weekly digest</h1>
+<div class="lead">Everything below has not gone to the property yet. Tick the days to include, check the addresses, send. One email per property, one PDF per day.</div>
+<div class="top-actions">
+<button type="button" class="btn ghost" id="refresh">Refresh</button>
+<button type="button" class="btn ghost" id="tickWeek">Tick everything from the last 7 days</button>
+<button type="button" class="btn ghost" id="clear">Untick all</button>
+<span class="cnt" id="count"></span>
+</div>
+<div id="list"><div class="empty"><div class="skel" style="width:40%;margin:0 auto 10px"></div><div class="skel" style="width:70%;margin:0 auto"></div></div></div>
+</main>
+
+<script src="https://citywidelv.github.io/cw-ops-desk/cw-auth.js"></script>
+<script src="ov-shared.js"></script>
+<script>
+(function(){
+var $ = OV.$, esc = OV.esc;
+var PASS = CWAuth.require({ hub:"ops" });
+if(!PASS) return;
+var api = function(kind, body){ body = body || {}; body.passcode = PASS; return OV.api(kind, body).then(function(r){ if(r && r.ok === false && /passcode/i.test(String(r.error || ""))) { CWAuth.locked("ops", r.error); throw new Error(r.error); } return r; }); };
+var S = { checks:[], reports:[], props:{}, cc_always:"", sel:{}, sent:{}, busy:{} };
+
+$("me").value = (function(){ try { return localStorage.getItem("cwOpsName") || ""; } catch(e){ return ""; } })();
+$("me").addEventListener("change", function(){ try { localStorage.setItem("cwOpsName", $("me").value); } catch(e){} });
+function toast(m, bad){ var t = document.createElement("div"); t.className = "toast"; if(bad) t.style.background = "#D22730"; t.textContent = m; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 3200); }
+
+function load(){
+  api("ov_digest_list").then(function(r){
+    if(!r.ok) throw new Error(r.error);
+    S.checks = r.checklists || []; S.reports = r.reports || [];
+    S.props = {}; (r.properties || []).forEach(function(p){ S.props[p.property] = p; });
+    S.cc_always = (r.config && r.config.cc_always) || "";
+    S.sel = {}; S.sent = {};
+    paint();
+  }).catch(function(e){ $("list").innerHTML = '<div class="empty">' + esc(e.message || e) + '</div>'; });
+}
+function items(){ return S.checks.concat(S.reports); }
+function byProp(){
+  var g = {};
+  items().forEach(function(x){ (g[x.property] = g[x.property] || []).push(x); });
+  var names = Object.keys(g).sort(function(a, b){
+    var pa = OV.byName(a), pb = OV.byName(b);
+    var aa = pa && pa.awarded ? 0 : 1, ab = pb && pb.awarded ? 0 : 1;
+    return (aa - ab) || a.localeCompare(b);
+  });
+  return names.map(function(n){ return { name:n, list:g[n] }; });
+}
+function selectedIn(list){ return list.filter(function(x){ return S.sel[x.id] && !S.sent[x.id]; }); }
+function paint(){
+  var groups = byProp();
+  var total = items().length - Object.keys(S.sent).length;
+  var selN = Object.keys(S.sel).filter(function(k){ return S.sel[k] && !S.sent[k]; }).length;
+  $("count").textContent = total ? total + " unsent item" + (total === 1 ? "" : "s") + (selN ? ", " + selN + " ticked" : "") : "";
+  if(!groups.length){ $("list").innerHTML = '<div class="empty"><b>Nothing waiting.</b><br>Every checklist and report has been sent to its property.</div>'; return; }
+  $("list").innerHTML = groups.map(function(g){
+    var p = S.props[g.name] || {};
+    var checks = g.list.filter(function(x){ return x.type === "checklist"; }).sort(function(a, b){ return String(b.service_date).localeCompare(String(a.service_date)) || String(b.created_at).localeCompare(String(a.created_at)); });
+    var reps = g.list.filter(function(x){ return x.type === "report"; }).sort(function(a, b){ return String(b.created_at).localeCompare(String(a.created_at)); });
+    var open = g.list.filter(function(x){ return !S.sent[x.id]; });
+    var sel = selectedIn(g.list);
+    var allOn = open.length && sel.length === open.length;
+    var dup = {};
+    checks.forEach(function(x){ dup[x.service_date] = (dup[x.service_date] || 0) + 1; });
+    function row(x){
+      var isC = x.type === "checklist", sent = !!S.sent[x.id], on = !!S.sel[x.id] && !sent;
+      var dateBig = isC ? x.day : OV.fmtDate(x.created_at);
+      var dateSmall = isC ? ("Checklist" + (dup[x.service_date] > 1 ? " (one of " + dup[x.service_date] + " that day)" : "") + (x.status !== "New" ? " · " + x.status : " · not yet approved")) : ((x.emergency ? "EMERGENCY · " : "") + (x.porter ? "Porter" : "Ovation") + " " + (/request/i.test(x.mode) ? "request" : "report") + (x.status !== "New" ? " · " + x.status : " · not yet reviewed"));
+      var detail = isC
+        ? 'Porter <b>' + esc(x.porter) + '</b> · ' + esc(x.areas_done) + ' areas serviced · ' + esc(x.tasks_checked) + ' of ' + esc(x.tasks_total) + ' tasks · ' + esc(x.photos) + ' photos' + (x.followups ? '<br>Reported to the property: <b>' + esc(x.followups) + '</b>' : '') + (x.supplies ? '<br>Supplies low: ' + esc(x.supplies) : '')
+        : '<b>' + esc(x.mode) + (x.category ? ': ' + esc(x.category) : '') + '</b> from ' + esc(x.submitter) + (x.role ? ' (' + esc(x.role) + ')' : '') + (x.summary ? '<br>' + esc(x.summary) : '');
+      return '<label class="row' + (on ? ' on' : '') + (sent ? ' sent' : '') + '" data-id="' + esc(x.id) + '"><input type="checkbox" data-sel="' + esc(x.id) + '"' + (on ? ' checked' : '') + (sent ? ' disabled' : '') + '>' +
+        '<div class="date">' + esc(dateBig) + '<small>' + esc(dateSmall) + '</small></div><div class="d">' + detail + '</div>' +
+        (sent ? '<span class="pdf yes">Sent</span>' : (x.emergency ? '<span class="pdf em">Emergency</span>' : '') + '<span class="pdf' + (x.has_pdf ? ' yes' : '') + '">' + (x.has_pdf ? 'PDF ready' : 'PDF built on send') + '</span>') +
+        '<a class="open" href="review.html?t=' + (isC ? 'checklist' : 'report') + '&id=' + encodeURIComponent(x.id) + '" target="_blank" rel="noopener" data-open="1">Open &rarr;</a></label>';
+    }
+    var busy = !!S.busy[g.name];
+    var h = '<div class="prop" data-prop="' + esc(g.name) + '">' +
+      '<div class="ph"><div class="name">' + esc(g.name) + '<small>' + open.length + ' unsent · ' + (p.contact_email ? 'to ' + esc(p.contact_email) : '<span style="color:var(--red)">no property email on file yet</span>') + (p.fsm ? ' · FSM ' + esc(p.fsm) : '') + '</small></div>' +
+      '<span class="sel"><b>' + sel.length + '</b> ticked</span>' +
+      '<label class="all"><input type="checkbox" data-all="' + esc(g.name) + '"' + (allOn ? ' checked' : '') + (open.length ? '' : ' disabled') + '>Select all</label></div>';
+    if(checks.length) h += '<div class="sec">Daily checklists</div>' + checks.map(row).join("");
+    if(reps.length) h += '<div class="sec">Reports and requests</div>' + reps.map(row).join("");
+    h += '<div class="send">' +
+      '<div class="field"><label>To (property)</label><input type="text" data-to="' + esc(g.name) + '" value="' + esc(p.contact_email || "") + '" placeholder="manager@ovationco.com"></div>' +
+      '<div class="field"><label>CC</label><input type="text" data-cc="' + esc(g.name) + '" value="' + esc(p.cc_email || "") + '" placeholder="Optional"></div>' +
+      '<div class="field"><label>Reply-to (you)</label><input type="text" data-reply="' + esc(g.name) + '" value="' + esc(p.fsm_email || "") + '" placeholder="your@gocitywide.com"></div>' +
+      '<details><summary>Subject and message (optional, a standard one is used if blank)</summary><div class="field"><input type="text" data-subj="' + esc(g.name) + '" placeholder="City Wide weekly service report - ' + esc(g.name) + ' - (dates fill in automatically)"></div><div class="field"><textarea data-msg="' + esc(g.name) + '" placeholder="Hello,\n\nAttached are the day porter service reports for ' + esc(g.name) + '. Each day is its own PDF with the areas serviced, the tasks completed and photos from the shift.\n\nReply to this email with any questions.\n\nThank you,\nCity Wide Facility Solutions"></textarea></div></details>' +
+      '<div class="act"><button type="button" class="btn" data-send="' + esc(g.name) + '"' + (sel.length && !busy ? '' : ' disabled') + '>' + (busy ? 'Sending...' : 'Send digest for ' + esc(g.name) + (sel.length ? ' (' + sel.length + ')' : '')) + '</button>' +
+      '<label class="rem"><input type="checkbox" data-rem="' + esc(g.name) + '" checked>Remember these addresses</label><span class="msg" data-msgline="' + esc(g.name) + '">' + (S.cc_always ? 'Always CC: ' + esc(S.cc_always) : '') + '</span></div>' +
+      '</div></div>';
+    return h;
+  }).join("");
+  wire();
+}
+function wire(){
+  var host = $("list");
+  host.querySelectorAll("[data-sel]").forEach(function(c){ c.addEventListener("change", function(){ S.sel[c.getAttribute("data-sel")] = c.checked; paintCounts(); }); });
+  host.querySelectorAll("[data-open]").forEach(function(a){ a.addEventListener("click", function(e){ e.stopPropagation(); }); });
+  host.querySelectorAll("[data-all]").forEach(function(c){ c.addEventListener("change", function(){
+    var name = c.getAttribute("data-all");
+    items().forEach(function(x){ if(x.property === name && !S.sent[x.id]) S.sel[x.id] = c.checked; });
+    paint();
+  }); });
+  host.querySelectorAll("[data-send]").forEach(function(b){ b.addEventListener("click", function(){ send(b.getAttribute("data-send")); }); });
+}
+/* cheap repaint: counts, row highlight and the send button, without rebuilding inputs the FSM may be typing in */
+function paintCounts(){
+  var selN = 0;
+  document.querySelectorAll(".prop").forEach(function(box){
+    var name = box.getAttribute("data-prop");
+    var list = items().filter(function(x){ return x.property === name; });
+    var open = list.filter(function(x){ return !S.sent[x.id]; }), sel = selectedIn(list);
+    selN += sel.length;
+    box.querySelector(".sel b").textContent = sel.length;
+    var all = box.querySelector("[data-all]"); if(all) all.checked = open.length > 0 && sel.length === open.length;
+    box.querySelectorAll(".row").forEach(function(r){ var id = r.getAttribute("data-id"); r.classList.toggle("on", !!S.sel[id] && !S.sent[id]); });
+    var btn = box.querySelector("[data-send]"); if(btn && !S.busy[name]){ btn.disabled = !sel.length; btn.textContent = "Send digest for " + name + (sel.length ? " (" + sel.length + ")" : ""); }
+  });
+  var total = items().length - Object.keys(S.sent).length;
+  $("count").textContent = total ? total + " unsent item" + (total === 1 ? "" : "s") + (selN ? ", " + selN + " ticked" : "") : "";
+}
+function send(name){
+  var list = items().filter(function(x){ return x.property === name; });
+  var sel = selectedIn(list);
+  var box = document.querySelector('.prop[data-prop="' + CSS.escape(name) + '"]');
+  var line = box.querySelector("[data-msgline]");
+  function say(m, cls){ line.textContent = m; line.className = "msg " + (cls || ""); }
+  if(!sel.length){ say("Tick at least one item.", "bad"); return; }
+  var to = box.querySelector("[data-to]").value.trim();
+  if(!/@/.test(to)){ say("Enter the property's email address first.", "bad"); box.querySelector("[data-to]").focus(); return; }
+  if(sel.length > 14){ say("Tick 14 or fewer. Send the rest as a second digest.", "bad"); return; }
+  var unbuilt = sel.filter(function(x){ return !x.has_pdf; }).length;
+  var notReviewed = sel.filter(function(x){ return x.status === "New"; }).length;
+  var warn = [];
+  if(notReviewed) warn.push(notReviewed + " of these " + (notReviewed === 1 ? "has" : "have") + " not been reviewed or approved yet");
+  if(unbuilt) warn.push(unbuilt + " PDF" + (unbuilt === 1 ? "" : "s") + " will be built from the porter's own checklist, unedited");
+  if(warn.length && !confirm("Send " + sel.length + " item" + (sel.length === 1 ? "" : "s") + " to " + to + "?\n\n" + warn.join(".\n") + ".\n\nOK to send as is?")) return;
+  S.busy[name] = true; paintCounts();
+  var btn = box.querySelector("[data-send]"); btn.disabled = true; btn.textContent = "Sending" + (unbuilt ? ", building " + unbuilt + " PDF" + (unbuilt === 1 ? "" : "s") + "..." : "...");
+  say("This takes a moment" + (unbuilt ? " while the PDFs are built." : "."), "");
+  api("ov_digest_send", { ids: sel.map(function(x){ return x.id; }), to: to, cc: box.querySelector("[data-cc]").value, reply_to: box.querySelector("[data-reply]").value,
+    subject: box.querySelector("[data-subj]").value, message: box.querySelector("[data-msg]").value, fsm_name: $("me").value })
+  .then(function(r){
+    if(!r.ok) throw new Error(r.error);
+    sel.forEach(function(x){ S.sent[x.id] = true; S.sel[x.id] = false; });
+    if(box.querySelector("[data-rem]").checked){
+      api("ov_property_set", { property:name, contact_email:to, cc_email:box.querySelector("[data-cc]").value, fsm_email:box.querySelector("[data-reply]").value, fsm:$("me").value }).catch(function(){});
+      S.props[name] = S.props[name] || { property:name }; S.props[name].contact_email = to;
+    }
+    S.busy[name] = false;
+    paint();
+    var l2 = document.querySelector('.prop[data-prop="' + CSS.escape(name) + '"] [data-msgline]');
+    if(l2){ l2.textContent = "Sent " + r.sent.length + " item" + (r.sent.length === 1 ? "" : "s") + " to " + r.sent_to.join(", ") + (r.cc && r.cc.length ? " (cc " + r.cc.join(", ") + ")" : "") + "."; l2.className = "msg ok"; }
+    toast("Digest sent for " + name);
+  }).catch(function(e){
+    S.busy[name] = false; paintCounts();
+    say(e.message || String(e), "bad");
+    toast("Not sent: " + (e.message || e), true);
+  });
+}
+$("refresh").addEventListener("click", load);
+$("clear").addEventListener("click", function(){ S.sel = {}; paint(); });
+$("tickWeek").addEventListener("click", function(){
+  var since = Date.now() - 7 * 86400000;
+  items().forEach(function(x){ if(S.sent[x.id]) return; var t = Date.parse(x.type === "checklist" ? (x.service_date + "T12:00:00") : x.created_at); S.sel[x.id] = !t || t >= since; });
+  paint();
+});
+load();
+})();
+</script>
+</body>
+</html>

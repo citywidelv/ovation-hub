@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <title>Ovation Review Queue | City Wide</title>
-<!-- build 2026-10-22d: header laid out on one row at the page width (back link, logos, title, name box) so nothing overlaps.
+<!-- build 2026-10-23: Create a weekly digest button (digest.html). Status filter gained Scheduled and Done, the statuses the Ops Hub Alerts card can set on a report.
+     build 2026-10-22d: header laid out on one row at the page width (back link, logos, title, name box) so nothing overlaps.
      build 2026-10-22c: co-brand. Ovation logo beside City Wide in the header and on the PDF band.
      build 2026-10-22b: phone pass. Under 600px the list hides while an item is open (Back to the list link), 44px rows, name box on its own row.
      build 2026-10-22: FSM review queue for the Ovation Hub. Team passcode (CWAuth.require, Ops Hub gate).
@@ -39,6 +40,7 @@ header.top .tag,header.top .tag b{white-space:nowrap;overflow:hidden;text-overfl
   .who input{flex:1;min-height:44px;font-size:16px}
   .tabs .chip{flex:1 1 40%;text-align:center;justify-content:center}
   .tabs a.chip{flex:1 1 100%;font-size:13px}
+  .tabs a.chip.on{order:-1}
   .filters select{flex:1 1 40%;min-height:44px;font-size:16px}
   .filters .btn{min-height:44px}
   #bookLink{display:none !important}
@@ -107,10 +109,11 @@ header.top .tag,header.top .tag b{white-space:nowrap;overflow:hidden;text-overfl
 <div class="tabs" id="tabs">
 <button type="button" class="chip on" data-t="checklist">Porter Checklists</button>
 <button type="button" class="chip" data-t="report">Reports &amp; Requests</button>
-<a class="chip" href="index.html" style="margin-left:auto;text-decoration:none">Ovation Hub (client side) &rarr;</a>
+<a class="chip on red" href="digest.html" style="margin-left:auto;text-decoration:none">Create a weekly digest &rarr;</a>
+<a class="chip" href="index.html" style="text-decoration:none">Ovation Hub (client side) &rarr;</a>
 </div>
 <div class="filters">
-<select id="fstatus"><option value="New">New</option><option value="Reviewed">Reviewed</option><option value="Sent">Sent</option><option value="">All</option></select>
+<select id="fstatus"><option value="New">New</option><option value="Reviewed">Reviewed</option><option value="Scheduled">Scheduled</option><option value="Done">Done</option><option value="Sent">Sent</option><option value="">All</option></select>
 <select id="fprop"><option value="">All properties</option></select>
 <button type="button" class="btn ghost sm" id="refresh">Refresh</button>
 <span id="count" style="font-size:12px;color:var(--grey)"></span>

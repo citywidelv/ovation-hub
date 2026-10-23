@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Porter Desk | Ovation Hub</title>
-<!-- build 2026-10-22: Porter desk. Three doors for the day porter: today's checklist, messages from the property
+<!-- build 2026-10-23: Emergency or maintenance issue tile (porter-report.html) at the top of the desk.
+     build 2026-10-22: Porter desk. Three doors for the day porter: today's checklist, messages from the property
      (Ovation reports and requests, anonymised by the backend), past reports (checklist PDFs). Property is
      remembered on the phone (cwOvPorterProp). No fetch on load. -->
 <link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
@@ -20,6 +21,9 @@
 .tile .go{margin:0;flex:none;font-size:20px}
 .prop{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .prop select{flex:1;min-width:200px}
+.tile.em{border-top-color:var(--red);background:var(--warnbg)}
+.tile.em .ic{background:#fff;color:var(--red)}
+.tile.em h2{color:var(--red)}
 </style>
 <link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
 </head>
@@ -43,6 +47,11 @@
 </div>
 
 <div class="tiles">
+<a class="tile em" href="porter-report.html">
+<div class="ic">&#9888;</div>
+<div class="t"><h2>Emergency or maintenance issue</h2><p>Something dangerous, or something broken. Take a photo and send it. Your FSM gets it right away.</p></div>
+<div class="go">&rarr;</div>
+</a>
 <a class="tile" href="checklist.html">
 <div class="ic">&#9745;</div>
 <div class="t"><h2>Today's checklist</h2><p>Tick what you did, add photos as you go, submit at the end of the shift.</p></div>
