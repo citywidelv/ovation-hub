@@ -147,7 +147,8 @@ function paintCover(){
   var el = $("cover");
   if(S.type !== "checklist" || !S.data){ el.innerHTML = ""; return; }
   var today = S.data.today;
-  var live = (S.data.properties || []).filter(function(p){ var started = p.start && String(p.start).slice(0, 10) <= today; return String(p.awarded).toUpperCase() === "Y" && started; });
+  var seen = {}; S.data.checklists.forEach(function(c){ seen[c.property] = true; });
+  var live = (S.data.properties || []).filter(function(p){ var started = p.start && String(p.start).slice(0, 10) <= today; return String(p.awarded).toUpperCase() === "Y" && (started || seen[p.property]); });
   if(!live.length){ el.innerHTML = ""; return; }
   var have = {}; S.data.checklists.forEach(function(c){ if(String(c.service_date) === today) have[c.property] = true; });
   el.innerHTML = '<span class="lbl">Today:</span>' + live.map(function(p){ return '<span class="c ' + (have[p.property] ? 'in' : 'out') + '">' + esc(p.property) + (have[p.property] ? ' &#10003;' : ' no checklist yet') + '</span>'; }).join("");
