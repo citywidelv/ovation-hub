@@ -9,6 +9,8 @@ properties. Live at https://citywidelv.github.io/ovation-hub/
 | `report.html` | Ovation staff | same |
 | `checklist.html` | Porters | same |
 | `review.html` | City Wide FSMs | Team passcode (`cw-auth.js`, bounces to the Ops Hub gate) |
+| `digest.html` | City Wide FSMs | same. Weekly digest to the property, one email per property |
+| `recipients.html` | City Wide FSMs | same. Who gets what per property: To, CC, contact, FSM and FSM email (Properties tab) |
 
 `ov-shared.js` carries the property list (41 Ovation communities, 12 awarded), the Aspire at
 Redwood day porter workflow as the checklist, the gate, the post helper and the photo shrinker.

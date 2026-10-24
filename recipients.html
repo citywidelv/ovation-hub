@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Digest Recipients | Ovation Review Queue</title>
+<!-- build 2026-10-24: who gets what, per property. One place to set the property's email (To on the weekly digest
+     and on PDFs sent from the review queue), the CC list, the contact name, and the FSM for the property (their email
+     is the reply-to on everything sent to the property and gets every Ovation report for that property the moment
+     it lands). Reads and writes the Properties tab of the CW Ovation Hub book (ov_properties / ov_property_set).
+     The hub-wide addresses on the Config tab are shown read-only with a link to the tab. Team passcode
+     (CWAuth.require, Ops Hub gate). -->
+<link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
+<link rel="stylesheet" href="ov.css">
+<style>
+body{background:var(--light)}
+main.wrap{max-width:1020px;padding-bottom:80px}
+header.top .bar{max-width:1020px;gap:18px}
+header.top .bar .back{flex:none;white-space:nowrap}
+header.top .bar .back + .brands{flex:none}
+header.top .tag{flex:1;min-width:0}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 14px}
+.toolbar input[type=text]{flex:1 1 240px;min-height:44px;font-size:15px}
+.toolbar .btn{width:auto;min-height:44px;padding:10px 14px;font-size:14px}
+.toolbar .cnt{font-size:13px;color:var(--grey)}
+.cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 18px}
+.cfg .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--grey)}
+.cfg .v{font-size:14px;font-weight:700;word-break:break-word;min-height:1.4em}
+.cfg .v.none{color:var(--grey);font-weight:400}
+.cfg .w{font-size:12px;color:var(--grey);margin-top:2px}
+.gh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--grey);margin:18px 0 8px;display:flex;align-items:center;gap:10px}
+.gh:after{content:"";flex:1;height:1px;background:var(--border)}
+.prop{background:var(--white);border:1px solid var(--border);border-left:4px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.prop.aw{border-left-color:var(--red)}
+.prop.ok{border-left-color:var(--ok)}
+.prop.dirty{border-left-color:var(--gold)}
+.prop .ph{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--light);flex-wrap:wrap}
+.prop .ph .name{font-size:17px;font-weight:700;line-height:1.2;flex:1;min-width:200px}
+.prop .ph .name small{display:block;font-size:12px;font-weight:400;color:var(--grey);margin-top:2px}
+.prop .ph .st{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;border-radius:999px;padding:4px 10px;background:var(--light);color:var(--grey);flex:none}
+.prop .ph .st.ok{background:var(--okbg);color:var(--ok)}
+.prop .ph .st.bad{background:var(--warnbg);color:var(--red)}
+.prop .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;padding:12px 16px 4px}
+.prop .grid .field{margin:0 0 6px}
+.prop .grid .field label{font-size:12px}
+.prop .grid .field input{min-height:42px;font-size:14px;padding:8px 10px}
+.prop .grid .field .hint{margin-top:3px}
+.prop .act{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 16px 14px}
+.prop .act .btn{width:auto;min-height:42px;padding:9px 16px;font-size:14px}
+.prop .act .msg{font-size:13px;color:var(--grey);flex:1}
+.prop .act .msg.bad{color:var(--red);font-weight:700}
+.prop .act .msg.ok{color:var(--ok);font-weight:700}
+.empty{padding:36px 20px;text-align:center;color:var(--grey);font-size:14px;background:var(--white);border:1px dashed var(--border);border-radius:14px}
+.skel{height:14px;border-radius:7px;background:linear-gradient(90deg,#eee,#f7f7f7,#eee);background-size:200% 100%;animation:sk 1.1s infinite}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--black);color:#fff;font-size:13px;font-weight:700;padding:10px 16px;border-radius:999px;z-index:70;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+details.others summary{cursor:pointer;font-size:14px;font-weight:700;min-height:44px;display:flex;align-items:center;color:var(--black)}
+@media(max-width:700px){
+  header.top .brands{display:none}
+  .prop .grid{grid-template-columns:1fr}
+  .prop .grid .field input{min-height:44px;font-size:16px}
+  .prop .act .btn{flex:1 1 100%}
+}
+</style>
+<link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
+</head>
+<body>
+<header class="top">
+<div class="bar">
+<a class="back" href="review.html">&larr; Review Queue</a>
+<div class="brands"><img class="cw" src="https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png" alt="City Wide Facility Solutions"><span class="div"></span><img class="ovl" src="ovation-logo.svg" alt="Ovation Property Management"></div>
+<div class="tag"><b>Digest Recipients</b>Who gets what, per property</div>
+</div>
+</header>
+
+<main class="wrap">
+<h1>Digest recipients</h1>
+<div class="lead">Set each property once. The weekly digest, PDFs sent from the review queue, and the immediate report emails all read from here. Saves apply to the next send, no deploy.</div>
+
+<div class="card olive">
+<h2>Every property</h2>
+<div class="sub">Hub-wide addresses from the Config tab. These apply on top of the per-property lists below. <a id="cfgLink" href="#" target="_blank" rel="noopener">Edit them on the Config tab of the book &rarr;</a></div>
+<div class="cfg" id="cfg"><div><div class="skel" style="width:60%"></div></div><div><div class="skel" style="width:60%"></div></div><div><div class="skel" style="width:60%"></div></div></div>
+</div>
+
+<div class="toolbar">
+<input type="text" id="q" placeholder="Find a property" autocomplete="off">
+<button type="button" class="btn ghost" id="refresh">Refresh</button>
+<span class="cnt" id="count"></span>
+</div>
+
+<div id="list"><div class="empty"><div class="skel" style="width:40%;margin:0 auto 10px"></div><div class="skel" style="width:70%;margin:0 auto"></div></div></div>
+<datalist id="staffList"></datalist>
+</main>
+
+<script src="https://citywidelv.github.io/cw-ops-desk/cw-auth.js"></script>
+<script src="ov-shared.js"></script>
+<script>
+(function(){
+var $ = OV.$, esc = OV.esc;
+var PASS = CWAuth.require({ hub:"ops" });
+if(!PASS) return;
+var api = function(kind, body){ body = body || {}; body.passcode = PASS; return OV.api(kind, body).then(function(r){ if(r && r.ok === false && /passcode/i.test(String(r.error || ""))) { CWAuth.locked("ops", r.error); throw new Error(r.error); } return r; }); };
+var FIELDS = ["contact_email", "cc_email", "contact_name", "fsm", "fsm_email"];
+var LABEL = {
+  contact_email:["Property email (To)", "Gets the weekly digest and every PDF sent to this property. Comma separated for more than one."],
+  cc_email:["CC", "Copied on everything sent to this property. Optional."],
+  contact_name:["Contact name", "Community manager or whoever the digest is addressed to."],
+  fsm:["FSM", "The City Wide FSM for this property. Pick a name and the email fills in."],
+  fsm_email:["FSM email", "Reply-to on everything sent to this property. Also gets every Ovation report for it the moment it lands."]
+};
+var CFG_HELP = { report_notify:"Gets every Ovation report and request, all properties, immediately", emergency_notify:"Extra addresses on a porter EMERGENCY", cc_always:"Always CC on PDFs and digests sent to a property", reply_to:"Reply-to when the property has no FSM email below", sender_name:"Display name on every email" };
+var S = { props:[], staff:[], dirty:{}, busy:{} };
+
+function toast(m, bad){ var t = document.createElement("div"); t.className = "toast"; if(bad) t.style.background = "#D22730"; t.textContent = m; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 3200); }
+function emailsOk(v){ v = String(v || "").trim(); if(!v) return true; return v.split(/[,;\s]+/).filter(Boolean).every(function(a){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a); }); }
+function isAw(p){ return /^(y|yes|true|1)$/i.test(String(p.awarded || "").trim()); }
+function niceDay(v){ var s = String(v || "").slice(0, 10); if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; var d = new Date(s + "T12:00:00"); return isNaN(d) ? s : d.toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }); }
+
+function renderCfg(cfg){
+  var keys = Object.keys(CFG_HELP).filter(function(k){ return k in cfg; });
+  $("cfg").innerHTML = keys.map(function(k){
+    var v = String(cfg[k] || "").trim();
+    return '<div><div class="k">' + esc(k) + '</div><div class="v' + (v ? '' : ' none') + '">' + (v ? esc(v) : 'none') + '</div><div class="w">' + esc(CFG_HELP[k]) + '</div></div>';
+  }).join("") || '<div class="w">No Config tab values yet.</div>';
+}
+
+function load(){
+  $("list").innerHTML = '<div class="empty"><div class="skel" style="width:40%;margin:0 auto 10px"></div><div class="skel" style="width:70%;margin:0 auto"></div></div>';
+  api("ov_properties").then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.error) || "Could not load the Properties tab");
+    S.props = (r.properties || []).map(function(p){ var o = {}; Object.keys(p).forEach(function(k){ o[k] = p[k] == null ? "" : String(p[k]); }); return o; });
+    S.dirty = {};
+    if(r.url){ $("cfgLink").href = r.url; }
+    paint();
+  }).catch(function(e){ $("list").innerHTML = '<div class="empty">' + esc(e.message || e) + '</div>'; });
+  api("ov_config").then(function(r){ if(r && r.ok) renderCfg(r.config || {}); }).catch(function(){ $("cfg").innerHTML = '<div class="w">Could not read the Config tab.</div>'; });
+}
+
+/* Team directory for the FSM picker: cached 12 hours like the other hub pages. Never blocks the paint. */
+function loadStaff(){
+  var c = null; try { c = JSON.parse(localStorage.getItem("cwStaffList") || "null"); } catch(e){}
+  if(c && c.t && Date.now() - c.t < 12 * 3600000 && c.s && c.s.length){ S.staff = c.s; fillStaff(); return; }
+  api("staff_list").then(function(r){ S.staff = (r && r.ok && r.staff) || []; try { localStorage.setItem("cwStaffList", JSON.stringify({ t:Date.now(), s:S.staff })); } catch(e){} fillStaff(); }).catch(function(){});
+}
+function fillStaff(){
+  var names = {}; S.staff.forEach(function(s){ if(s && s.name) names[s.name] = 1; });
+  $("staffList").innerHTML = Object.keys(names).sort().map(function(n){ return '<option value="' + esc(n) + '">'; }).join("");
+}
+function staffEmail(name){
+  var k = String(name || "").trim().toLowerCase(); if(!k) return "";
+  for(var i = 0; i < S.staff.length; i++){ var s = S.staff[i]; if(s && String(s.name || "").trim().toLowerCase() === k) return String(s.email || ""); }
+  return "";
+}
+
+function state(p){
+  if(S.dirty[p.property]) return ["dirty", "Unsaved"];
+  if(String(p.contact_email || "").trim()) return ["ok", "Ready"];
+  return [isAw(p) ? "aw" : "", isAw(p) ? "No property email" : "No email"];
+}
+function card(p){
+  var st = state(p), busy = !!S.busy[p.property];
+  var meta = [p.group, isAw(p) ? "Awarded" + (p.start ? ", porter starts " + niceDay(p.start) : "") + (p.porter_days ? ", " + p.porter_days + " days a week" : "") : "Not awarded", p.address].filter(Boolean).join(" · ");
+  var h = '<div class="prop' + (st[0] ? ' ' + st[0] : '') + '" data-prop="' + esc(p.property) + '">' +
+    '<div class="ph"><div class="name">' + esc(p.property) + '<small>' + esc(meta) + '</small></div><span class="st ' + (st[0] === "ok" ? "ok" : st[0] === "dirty" ? "" : (isAw(p) ? "bad" : "")) + '" data-st>' + esc(st[1]) + '</span></div>' +
+    '<div class="grid">' + FIELDS.map(function(k){
+      return '<div class="field"><label>' + esc(LABEL[k][0]) + '</label><input type="text" data-f="' + k + '" value="' + esc(p[k] || "") + '"' + (k === "fsm" ? ' list="staffList" autocomplete="off"' : k === "contact_name" ? ' autocomplete="off"' : ' inputmode="email" autocomplete="off"') + '><div class="hint">' + esc(LABEL[k][1]) + '</div></div>';
+    }).join("") + '</div>' +
+    '<div class="act"><button type="button" class="btn" data-save' + (S.dirty[p.property] && !busy ? '' : ' disabled') + '>' + (busy ? 'Saving...' : 'Save ' + esc(p.property)) + '</button><span class="msg" data-msg></span></div></div>';
+  return h;
+}
+function paint(){
+  var q = $("q").value.trim().toLowerCase();
+  var all = S.props.filter(function(p){ return p.property; });
+  var show = all.filter(function(p){ return !q || p.property.toLowerCase().indexOf(q) >= 0 || String(p.group || "").toLowerCase().indexOf(q) >= 0 || String(p.fsm || "").toLowerCase().indexOf(q) >= 0; });
+  var aw = show.filter(isAw).sort(function(a, b){ return a.property.localeCompare(b.property); });
+  var others = show.filter(function(p){ return !isAw(p); }).sort(function(a, b){ return String(a.group).localeCompare(String(b.group)) || a.property.localeCompare(b.property); });
+  var ready = all.filter(function(p){ return isAw(p) && String(p.contact_email || "").trim(); }).length, awN = all.filter(isAw).length;
+  $("count").textContent = awN ? ready + " of " + awN + " awarded properties have an email" : "";
+  if(!show.length){ $("list").innerHTML = '<div class="empty">No property matches.</div>'; return; }
+  var h = "";
+  if(aw.length) h += '<div class="gh">Awarded properties (' + aw.length + ')</div>' + aw.map(card).join("");
+  if(others.length){
+    var inner = "", g = "";
+    others.forEach(function(p){ if(p.group !== g){ g = p.group; inner += '<div class="gh">' + esc(g || "Other") + '</div>'; } inner += card(p); });
+    h += q ? inner : '<details class="others"' + (aw.length ? '' : ' open') + '><summary>Other Ovation properties, not awarded (' + others.length + '). Reports can still come in from these.</summary>' + inner + '</details>';
+  }
+  $("list").innerHTML = h;
+  wire();
+}
+function wire(){
+  $("list").querySelectorAll(".prop").forEach(function(box){
+    var name = box.getAttribute("data-prop");
+    var p = S.props.filter(function(x){ return x.property === name; })[0]; if(!p) return;
+    function check(){
+      var d = FIELDS.some(function(k){ return box.querySelector('[data-f="' + k + '"]').value.trim() !== String(p[k] || "").trim(); });
+      S.dirty[name] = d;
+      box.classList.toggle("dirty", d);
+      var b = box.querySelector("[data-save]"); if(!S.busy[name]) b.disabled = !d;
+      var st = box.querySelector("[data-st]"); if(d){ st.textContent = "Unsaved"; st.className = "st"; }
+    }
+    FIELDS.forEach(function(k){ box.querySelector('[data-f="' + k + '"]').addEventListener("input", check); });
+    var fsmIn = box.querySelector('[data-f="fsm"]'), fsmMail = box.querySelector('[data-f="fsm_email"]');
+    fsmIn.addEventListener("change", function(){ var e = staffEmail(fsmIn.value); if(e && !fsmMail.value.trim()){ fsmMail.value = e; check(); } });
+    box.querySelector("[data-save]").addEventListener("click", function(){ save(name, box, p); });
+  });
+}
+function save(name, box, p){
+  var line = box.querySelector("[data-msg]");
+  function say(m, cls){ line.textContent = m; line.className = "msg " + (cls || ""); }
+  var vals = {}; FIELDS.forEach(function(k){ vals[k] = box.querySelector('[data-f="' + k + '"]').value.trim(); });
+  var bad = ["contact_email", "cc_email", "fsm_email"].filter(function(k){ return !emailsOk(vals[k]); });
+  if(bad.length){ say("Check the " + LABEL[bad[0]][0] + " address.", "bad"); box.querySelector('[data-f="' + bad[0] + '"]').focus(); return; }
+  if(isAw(p) && !vals.contact_email && p.contact_email && !confirm("Clear the property email for " + name + "? The weekly digest cannot go out without one.")) return;
+  S.busy[name] = true;
+  var btn = box.querySelector("[data-save]"); btn.disabled = true; btn.textContent = "Saving...";
+  var body = { property:name }; FIELDS.forEach(function(k){ body[k] = vals[k]; });
+  api("ov_property_set", body).then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.error) || "Not saved");
+    FIELDS.forEach(function(k){ p[k] = vals[k]; });
+    S.busy[name] = false; S.dirty[name] = false;
+    box.classList.remove("dirty"); box.classList.toggle("ok", !!vals.contact_email);
+    var st = box.querySelector("[data-st]"); var s2 = state(p); st.textContent = s2[1]; st.className = "st " + (s2[0] === "ok" ? "ok" : (isAw(p) ? "bad" : ""));
+    btn.textContent = "Save " + name; btn.disabled = true;
+    say("Saved.", "ok"); toast("Saved " + name);
+    var ready = S.props.filter(function(x){ return isAw(x) && String(x.contact_email || "").trim(); }).length, awN = S.props.filter(isAw).length;
+    $("count").textContent = awN ? ready + " of " + awN + " awarded properties have an email" : "";
+  }).catch(function(e){
+    S.busy[name] = false; btn.disabled = false; btn.textContent = "Save " + name;
+    say(e.message || String(e), "bad"); toast("Not saved: " + (e.message || e), true);
+  });
+}
+var qt = null;
+$("q").addEventListener("input", function(){ clearTimeout(qt); qt = setTimeout(paint, 120); });
+$("refresh").addEventListener("click", function(){
+  var open = Object.keys(S.dirty).filter(function(k){ return S.dirty[k]; });
+  if(open.length && !confirm("You have unsaved changes on " + open.join(", ") + ". Refresh and lose them?")) return;
+  load();
+});
+window.addEventListener("beforeunload", function(e){ if(Object.keys(S.dirty).some(function(k){ return S.dirty[k]; })){ e.preventDefault(); e.returnValue = ""; } });
+load();
+loadStaff();
+})();
+</script>
+</body>
+</html>
