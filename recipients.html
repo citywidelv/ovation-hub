@@ -9,7 +9,9 @@
      and on PDFs sent from the review queue), the CC list, the contact name, and the FSM for the property (their email
      is the reply-to on everything sent to the property and gets every Ovation report for that property the moment
      it lands). Reads and writes the Properties tab of the CW Ovation Hub book (ov_properties / ov_property_set).
-     The hub-wide addresses on the Config tab are shown read-only with a link to the tab. Team passcode
+     The hub-wide addresses on the Config tab are edited here too (ov_config_set, whitelisted keys). Oct 29 2026 (TJ):
+     each property also names the porter vendor's site manager (vendor_name / vendor_email) who gets the daily
+     Ovation Hub summary, with a hub-wide default for properties with no vendor set. Team passcode
      (CWAuth.require, Ops Hub gate). -->
 <link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
 <link rel="stylesheet" href="ov.css">
@@ -29,6 +31,14 @@ header.top .tag{flex:1;min-width:0}
 .cfg .v{font-size:14px;font-weight:700;word-break:break-word;min-height:1.4em}
 .cfg .v.none{color:var(--grey);font-weight:400}
 .cfg .w{font-size:12px;color:var(--grey);margin-top:2px}
+.cfg .field{margin:0}
+.cfg .field label{font-size:12px}
+.cfg .field input{min-height:42px;font-size:14px;padding:8px 10px;width:100%}
+.cfgact{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.cfgact .btn{width:auto;min-height:42px;padding:9px 16px;font-size:14px}
+.cfgact .msg{font-size:13px;color:var(--grey);flex:1}
+.cfgact .msg.bad{color:var(--red);font-weight:700}
+.cfgact .msg.ok{color:var(--ok);font-weight:700}
 .gh{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--grey);margin:18px 0 8px;display:flex;align-items:center;gap:10px}
 .gh:after{content:"";flex:1;height:1px;background:var(--border)}
 .prop{background:var(--white);border:1px solid var(--border);border-left:4px solid var(--border);border-radius:14px;margin-bottom:12px;overflow:hidden}
@@ -76,12 +86,13 @@ details.others summary{cursor:pointer;font-size:14px;font-weight:700;min-height:
 
 <main class="wrap">
 <h1>Digest recipients</h1>
-<div class="lead">Set each property once. The weekly digest, PDFs sent from the review queue, and the immediate report emails all read from here. Saves apply to the next send, no deploy.</div>
+<div class="lead">Set each property once. The weekly digest, PDFs sent from the review queue, the immediate report emails and the daily vendor summary all read from here. Saves apply to the next send, no deploy.</div>
 
 <div class="card olive">
 <h2>Every property</h2>
-<div class="sub">Hub-wide addresses from the Config tab. These apply on top of the per-property lists below. <a id="cfgLink" href="#" target="_blank" rel="noopener">Edit them on the Config tab of the book &rarr;</a></div>
+<div class="sub">Hub-wide addresses. These apply on top of the per-property lists below. The daily vendor summary goes out every morning at 7 AM to the vendor on each property, or to the default vendor when the property has none. <a id="cfgLink" href="#" target="_blank" rel="noopener">Open the book &rarr;</a></div>
 <div class="cfg" id="cfg"><div><div class="skel" style="width:60%"></div></div><div><div class="skel" style="width:60%"></div></div><div><div class="skel" style="width:60%"></div></div></div>
+<div class="cfgact"><button type="button" class="btn" id="cfgSave" disabled>Save hub-wide settings</button><span class="msg" id="cfgMsg"></span></div>
 </div>
 
 <div class="toolbar">
@@ -102,16 +113,31 @@ var $ = OV.$, esc = OV.esc;
 var PASS = CWAuth.require({ hub:"ops" });
 if(!PASS) return;
 var api = function(kind, body){ body = body || {}; body.passcode = PASS; return OV.api(kind, body).then(function(r){ if(r && r.ok === false && /passcode/i.test(String(r.error || ""))) { CWAuth.locked("ops", r.error); throw new Error(r.error); } return r; }); };
-var FIELDS = ["contact_email", "cc_email", "contact_name", "fsm", "fsm_email"];
+var FIELDS = ["contact_email", "cc_email", "contact_name", "fsm", "fsm_email", "vendor_name", "vendor_email"];
 var LABEL = {
   contact_email:["Property email (To)", "Gets the weekly digest and every PDF sent to this property. Comma separated for more than one."],
   cc_email:["CC", "Copied on everything sent to this property. Optional."],
   contact_name:["Contact name", "Community manager or whoever the digest is addressed to."],
   fsm:["FSM", "The City Wide FSM for this property. Pick a name and the email fills in."],
-  fsm_email:["FSM email", "Reply-to on everything sent to this property. Also gets every Ovation report for it the moment it lands."]
+  fsm_email:["FSM email", "Reply-to on everything sent to this property. Also gets every Ovation report for it the moment it lands."],
+  vendor_name:["Vendor site manager", "The porter vendor's site manager for this property. Leave blank to use the default below."],
+  vendor_email:["Vendor email", "Gets the daily summary of checklists and reports for this property every morning. Leave blank to use the default vendor email below."]
 };
-var CFG_HELP = { report_notify:"Gets every Ovation report and request, all properties, immediately", emergency_notify:"Extra addresses on a porter EMERGENCY", cc_always:"Always CC on PDFs and digests sent to a property", reply_to:"Reply-to when the property has no FSM email below", sender_name:"Display name on every email" };
-var S = { props:[], staff:[], dirty:{}, busy:{} };
+var CFG_KEYS = ["vendor_default_name", "vendor_default_email", "vendor_daily_cc", "vendor_daily_live", "weekly_reminder_to", "report_notify", "emergency_notify", "cc_always", "reply_to", "sender_name"];
+var CFG_HELP = {
+  vendor_default_name:["Default vendor site manager", "Used for any property with no vendor set below"],
+  vendor_default_email:["Default vendor email", "Gets the daily summary for every property with no vendor email set below"],
+  vendor_daily_cc:["City Wide copied on the daily vendor summary", "Comma separated. Jake and Robert by default"],
+  vendor_daily_live:["Daily vendor summary live", "TRUE sends to the vendor. Anything else sends to TJ as a test"],
+  weekly_reminder_to:["Friday digest reminder goes to", "Who gets the Friday reminder to send the Ovation and Ken's weekly digests"],
+  report_notify:["Immediate report emails", "Gets every Ovation report and request, all properties, the moment it lands"],
+  emergency_notify:["Porter emergency extra", "Extra addresses on a porter EMERGENCY"],
+  cc_always:["Always CC", "Always CC on PDFs and digests sent to a property"],
+  reply_to:["Reply-to", "Reply-to when the property has no FSM email below"],
+  sender_name:["Sender name", "Display name on every email"]
+};
+var CFG_EMAIL = ["vendor_default_email", "vendor_daily_cc", "weekly_reminder_to", "report_notify", "emergency_notify", "cc_always", "reply_to"];
+var S = { props:[], staff:[], dirty:{}, busy:{}, cfg:{}, cfgBusy:false };
 
 function toast(m, bad){ var t = document.createElement("div"); t.className = "toast"; if(bad) t.style.background = "#D22730"; t.textContent = m; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 3200); }
 function emailsOk(v){ v = String(v || "").trim(); if(!v) return true; return v.split(/[,;\s]+/).filter(Boolean).every(function(a){ return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a); }); }
@@ -119,12 +145,36 @@ function isAw(p){ return /^(y|yes|true|1)$/i.test(String(p.awarded || "").trim()
 function niceDay(v){ var s = String(v || "").slice(0, 10); if(!/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; var d = new Date(s + "T12:00:00"); return isNaN(d) ? s : d.toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" }); }
 
 function renderCfg(cfg){
-  var keys = Object.keys(CFG_HELP).filter(function(k){ return k in cfg; });
-  $("cfg").innerHTML = keys.map(function(k){
-    var v = String(cfg[k] || "").trim();
-    return '<div><div class="k">' + esc(k) + '</div><div class="v' + (v ? '' : ' none') + '">' + (v ? esc(v) : 'none') + '</div><div class="w">' + esc(CFG_HELP[k]) + '</div></div>';
-  }).join("") || '<div class="w">No Config tab values yet.</div>';
+  S.cfg = {}; CFG_KEYS.forEach(function(k){ S.cfg[k] = String(cfg[k] == null ? "" : cfg[k]).trim(); });
+  $("cfg").innerHTML = CFG_KEYS.map(function(k){
+    return '<div class="field"><label>' + esc(CFG_HELP[k][0]) + '</label><input type="text" data-c="' + k + '" value="' + esc(S.cfg[k]) + '" autocomplete="off"' + (CFG_EMAIL.indexOf(k) >= 0 ? ' inputmode="email"' : '') + '><div class="w">' + esc(CFG_HELP[k][1]) + '</div></div>';
+  }).join("");
+  $("cfg").querySelectorAll("[data-c]").forEach(function(inp){ inp.addEventListener("input", cfgCheck); });
+  cfgCheck();
 }
+function cfgVals(){ var o = {}; $("cfg").querySelectorAll("[data-c]").forEach(function(inp){ o[inp.getAttribute("data-c")] = inp.value.trim(); }); return o; }
+function cfgCheck(){
+  var v = cfgVals(), d = CFG_KEYS.some(function(k){ return (v[k] || "") !== (S.cfg[k] || ""); });
+  $("cfgSave").disabled = !d || S.cfgBusy;
+  if(d){ $("cfgMsg").textContent = "Unsaved"; $("cfgMsg").className = "msg"; }
+}
+function cfgSave(){
+  var v = cfgVals();
+  var bad = CFG_EMAIL.filter(function(k){ return !emailsOk(v[k]); });
+  if(bad.length){ $("cfgMsg").textContent = "Check the " + CFG_HELP[bad[0]][0] + " address."; $("cfgMsg").className = "msg bad"; $("cfg").querySelector('[data-c="' + bad[0] + '"]').focus(); return; }
+  if(/^(true|yes|y|1)$/i.test(v.vendor_daily_live) && !/^(true|yes|y|1)$/i.test(S.cfg.vendor_daily_live) && !confirm("Turn the daily vendor summary live? From tomorrow morning it goes to the vendor, not to TJ.")) return;
+  S.cfgBusy = true; $("cfgSave").disabled = true; $("cfgSave").textContent = "Saving...";
+  api("ov_config_set", { values: JSON.stringify(v) }).then(function(r){
+    if(!r || !r.ok) throw new Error((r && r.error) || "Not saved");
+    S.cfgBusy = false; $("cfgSave").textContent = "Save hub-wide settings";
+    renderCfg(r.config || v);
+    $("cfgMsg").textContent = "Saved."; $("cfgMsg").className = "msg ok"; toast("Saved hub-wide settings");
+  }).catch(function(e){
+    S.cfgBusy = false; $("cfgSave").disabled = false; $("cfgSave").textContent = "Save hub-wide settings";
+    $("cfgMsg").textContent = e.message || String(e); $("cfgMsg").className = "msg bad"; toast("Not saved: " + (e.message || e), true);
+  });
+}
+$("cfgSave").addEventListener("click", cfgSave);
 
 function load(){
   $("list").innerHTML = '<div class="empty"><div class="skel" style="width:40%;margin:0 auto 10px"></div><div class="skel" style="width:70%;margin:0 auto"></div></div>';
@@ -165,7 +215,7 @@ function card(p){
   var h = '<div class="prop' + (st[0] ? ' ' + st[0] : '') + '" data-prop="' + esc(p.property) + '">' +
     '<div class="ph"><div class="name">' + esc(p.property) + '<small>' + esc(meta) + '</small></div><span class="st ' + (st[0] === "ok" ? "ok" : st[0] === "dirty" ? "" : (isAw(p) ? "bad" : "")) + '" data-st>' + esc(st[1]) + '</span></div>' +
     '<div class="grid">' + FIELDS.map(function(k){
-      return '<div class="field"><label>' + esc(LABEL[k][0]) + '</label><input type="text" data-f="' + k + '" value="' + esc(p[k] || "") + '"' + (k === "fsm" ? ' list="staffList" autocomplete="off"' : k === "contact_name" ? ' autocomplete="off"' : ' inputmode="email" autocomplete="off"') + '><div class="hint">' + esc(LABEL[k][1]) + '</div></div>';
+      return '<div class="field"><label>' + esc(LABEL[k][0]) + '</label><input type="text" data-f="' + k + '" value="' + esc(p[k] || "") + '"' + (k === "fsm" ? ' list="staffList" autocomplete="off"' : (k === "contact_name" || k === "vendor_name") ? ' autocomplete="off"' : ' inputmode="email" autocomplete="off"') + '><div class="hint">' + esc(LABEL[k][1]) + '</div></div>';
     }).join("") + '</div>' +
     '<div class="act"><button type="button" class="btn" data-save' + (S.dirty[p.property] && !busy ? '' : ' disabled') + '>' + (busy ? 'Saving...' : 'Save ' + esc(p.property)) + '</button><span class="msg" data-msg></span></div></div>';
   return h;
@@ -210,7 +260,7 @@ function save(name, box, p){
   var line = box.querySelector("[data-msg]");
   function say(m, cls){ line.textContent = m; line.className = "msg " + (cls || ""); }
   var vals = {}; FIELDS.forEach(function(k){ vals[k] = box.querySelector('[data-f="' + k + '"]').value.trim(); });
-  var bad = ["contact_email", "cc_email", "fsm_email"].filter(function(k){ return !emailsOk(vals[k]); });
+  var bad = ["contact_email", "cc_email", "fsm_email", "vendor_email"].filter(function(k){ return !emailsOk(vals[k]); });
   if(bad.length){ say("Check the " + LABEL[bad[0]][0] + " address.", "bad"); box.querySelector('[data-f="' + bad[0] + '"]').focus(); return; }
   if(isAw(p) && !vals.contact_email && p.contact_email && !confirm("Clear the property email for " + name + "? The weekly digest cannot go out without one.")) return;
   S.busy[name] = true;
@@ -238,7 +288,7 @@ $("refresh").addEventListener("click", function(){
   if(open.length && !confirm("You have unsaved changes on " + open.join(", ") + ". Refresh and lose them?")) return;
   load();
 });
-window.addEventListener("beforeunload", function(e){ if(Object.keys(S.dirty).some(function(k){ return S.dirty[k]; })){ e.preventDefault(); e.returnValue = ""; } });
+window.addEventListener("beforeunload", function(e){ if(Object.keys(S.dirty).some(function(k){ return S.dirty[k]; }) || !$("cfgSave").disabled){ e.preventDefault(); e.returnValue = ""; } });
 load();
 loadStaff();
 })();
