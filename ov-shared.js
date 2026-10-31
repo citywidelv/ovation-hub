@@ -1,4 +1,5 @@
-/* Ovation Hub shared layer. Build 2026-10-23 (Manager Desk gate added: mgrGate / mgrRequire / mgrApi, key cwOvationMgrPass).
+/* Ovation Hub shared layer. Build 2026-10-30 (checklist v2: QUICK, ROTATION, status and times helpers).
+   Build 2026-10-23 (Manager Desk gate added: mgrGate / mgrRequire / mgrApi, key cwOvationMgrPass).
    Build 2026-10-22b (client passcode only; porter pages).
    citywidelv.github.io/ovation-hub/ is a client-facing hub for Ovation Property Management
    staff and the day porters on their properties. Its passcode is its own (script property
@@ -111,6 +112,49 @@
   ];
   var PASSES = ["Opening pass (trash, pet stations, walkways, entries)", "Interior pass (lobbies, mail, elevators, hallways, clubhouse, leasing, fitness)",
     "Amenity pass (pool, spa, grill)", "Restroom checks (start, middle, end)", "Return passes through the shift", "Closing pass (final restroom check, entries, clubhouse, service log)"];
+
+  /* Build 2026-10-30 (TJ, Robert and Luigi): checklist v2. The porter reports what they focused
+     on, not a rotation. Per area: full clean / spot check / did not need it, how many times they
+     got to it (blank unless they say), and on a spot check a short list of what they touched.
+     QUICK is that short list per area (3 to 6 items). ROTATION is every weekly and monthly item
+     from the scope, pooled, so the porter ticks what they did today without opening each area.
+     AREAS above is kept as the scope definition ("a full clean covers") and for old submissions. */
+  var QUICK = {
+    restrooms: ["Toilets, urinals and sinks", "Counters, mirrors and fixtures", "Dispensers refilled", "Waste emptied", "Floors swept and mopped"],
+    clubhouse: ["Waste emptied", "Tables, counters and furniture wiped", "Fitness equipment disinfected", "Coffee bar and kitchenette", "Glass doors", "Floors vacuumed or mopped"],
+    lobbies: ["Waste emptied", "Entry and door glass", "Mailbox and package area", "Lobby floors", "Hallway floors", "Walls and touch points"],
+    elevators: ["Buttons and handrails disinfected", "Cab walls and doors", "Cab floor"],
+    pool: ["Litter picked up", "Chairs and tables wiped", "Waste emptied", "Grills", "Gate handles disinfected"],
+    pet: ["Stations emptied, liners replaced", "Bag dispensers refilled", "Pet waste picked up", "Relief areas sanitized"],
+    walkways: ["Litter picked up", "Walkways and entries swept", "Stairwells checked", "Outdoor furniture wiped"],
+    trash: ["Loose trash picked up", "Overflow checked", "Access checked", "Bins positioned or returned"],
+    all: ["Touch points disinfected", "Surfaces dusted", "Spills and sticky spots"],
+    closet: ["Closet organized", "Chemicals labeled and stored", "SDS on site"]
+  };
+  var ROTATION = [];
+  AREAS.forEach(function(a){
+    (a.weekly || []).forEach(function(t){ ROTATION.push({ t:t, area:a.name, key:a.key, f:"weekly" }); });
+    (a.monthly || []).forEach(function(t){ ROTATION.push({ t:t, area:a.name, key:a.key, f:"monthly" }); });
+  });
+  var STATUS_LABEL = { full:"Full clean", spot:"Spot check", none:"Checked, no cleaning needed" };
+  var TIMES = ["1", "2", "3", "4+"];
+  function isV2(doc){ return !!(doc && Number(doc.v) >= 2); }
+  function timesText(t){ t = String(t || ""); if(!t) return ""; return t === "1" ? "once" : t === "2" ? "twice" : t === "3" ? "3 times" : "4 or more times"; }
+  /* One line per reported area, for lists, emails and PDFs. */
+  function areaLine(a){
+    var s = STATUS_LABEL[a.status] || "Serviced";
+    var t = timesText(a.times);
+    return s + (t ? " · " + t : "");
+  }
+  function focusText(doc){
+    if(!isV2(doc)) return "";
+    return (doc.areas || []).filter(function(a){ return a.on; }).map(function(a){
+      var short = a.name.split(",")[0].split(" & ")[0];
+      var st = a.status === "full" ? "full clean" : a.status === "spot" ? "spot check" : a.status === "none" ? "checked" : "serviced";
+      var t = a.times && a.times !== "1" ? " x" + a.times : "";
+      return short + " " + st + t;
+    }).join(" · ");
+  }
 
   function ls(fn){ try { return fn(); } catch(e){ return null; } }
   function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
@@ -381,5 +425,6 @@
     getPass:getPass, setPass:setPass, clearPass:clearPass, isTeam:isTeam, post:post, api:api, validate:validate, hubGate:hubGate, require:require, locked:locked,
     mgrGate:mgrGate, mgrRequire:mgrRequire, mgrApi:mgrApi, mgrLocked:mgrLocked, mgrGetPass:mgrGetPass, mgrClearPass:mgrClearPass, MGRHUB:MGRHUB,
     shrink:shrink, thumb:thumb, uploadPhotos:uploadPhotos, saveDraft:saveDraft, loadDraft:loadDraft, clearDraft:clearDraft,
-    photoStore:photoStore, photoLoad:photoLoad, photoDrop:photoDrop, fmtDate:fmtDate, weekday:weekday, today:today };
+    photoStore:photoStore, photoLoad:photoLoad, photoDrop:photoDrop, fmtDate:fmtDate, weekday:weekday, today:today,
+    QUICK:QUICK, ROTATION:ROTATION, STATUS_LABEL:STATUS_LABEL, TIMES:TIMES, isV2:isV2, timesText:timesText, areaLine:areaLine, focusText:focusText };
 })();

@@ -96,6 +96,7 @@ header.top .tag{flex:1;min-width:0}
 <div class="cover" id="cover"></div>
 <div class="filters">
 <select id="fstatus"><option value="New">Waiting for approval</option><option value="">All</option><option value="Reviewed">Approved / reviewed</option><option value="Sent">Sent to the property</option></select>
+<select id="frange"><option value="60">Last 60 days</option><option value="180">Last 6 months</option><option value="3650">All time</option></select>
 <select id="fprop"><option value="">All properties</option></select>
 <button type="button" class="btn ghost sm" id="refresh">Refresh</button>
 <span id="count" style="font-size:12px;color:var(--grey)"></span>
@@ -126,7 +127,7 @@ function pill(st){ var s = String(st || "New"); var label = s === "New" ? (S.typ
 /* ---------- list ---------- */
 function load(){
   $("list").innerHTML = '<div class="empty">Loading...</div>';
-  api("ov_mgr_list").then(function(r){
+  api("ov_mgr_list", { days: Number($("frange").value) || 60 }).then(function(r){
     if(!r.ok) throw new Error(r.error);
     S.data = r; paintCover(); paintList();
     if(P.id && !S.cur){ openItem(P.id); P.id = ""; }
@@ -156,7 +157,7 @@ function paintCover(){
 function paintList(){
   var list = rows();
   $("count").textContent = list.length + " item" + (list.length === 1 ? "" : "s");
-  if(!list.length){ $("list").innerHTML = '<div class="empty">Nothing here. Change the filter to see more.</div>'; return; }
+  if(!list.length){ $("list").innerHTML = '<div class="empty">Nothing here. Pick All or a longer time range to see past reports. Approved and sent reports stay here.</div>'; return; }
   $("list").innerHTML = list.map(function(r){
     var m = S.type === "checklist"
       ? [esc(r.weekday) + " " + esc(r.service_date), esc(r.porter), r.areas_done + " areas", r.photos + " photos"]
@@ -171,7 +172,8 @@ $("tabs").querySelectorAll(".chip[data-t]").forEach(function(b){ b.addEventListe
   S.cur = null; $("detail").innerHTML = '<div class="card plain"><div class="empty">Pick an item to open it.</div></div>'; document.querySelector(".layout").classList.remove("open");
   paintCover(); paintList();
 }); });
-$("fstatus").addEventListener("change", paintList); $("fprop").addEventListener("change", paintList); $("refresh").addEventListener("click", load);
+$("fstatus").addEventListener("change", paintList); $("frange").addEventListener("change", load); $("fprop").addEventListener("change", paintList); $("refresh").addEventListener("click", load);
+if(P.id) $("frange").value = "3650";
 
 /* ---------- detail (read only, plus Approve on a checklist) ---------- */
 function openItem(id){
@@ -200,7 +202,29 @@ function paintDetail(){
       : '<div class="approve"><span class="done">&#10003; ' + (status() === "Sent" ? "Approved and already sent to the property by City Wide." : "Approved. City Wide will send it to the property.") + '</span>' + (d.manager_note ? '<span class="meta">Your note: ' + esc(d.manager_note) + '</span>' : '') + '</div>';
   }
   h += '</div>';
-  if(isCheck){
+  if(isCheck && OV.isV2(d)){
+    var onA = (d.areas || []).filter(function(a){ return a.on; }), offA = (d.areas || []).filter(function(a){ return !a.on; });
+    onA.forEach(function(a){
+      var def = OV.AREAS.filter(function(x){ return x.key === a.key; })[0] || { daily:[] };
+      h += '<div class="rarea"><div class="rh"><b>' + esc(a.name) + '</b><span class="st">' + esc(OV.areaLine(a)) + ' · ' + a.photos.length + ' photo' + (a.photos.length === 1 ? '' : 's') + '</span></div>';
+      h += '<div class="rb"><div>';
+      if(a.status === "full") h += '<div class="meta" style="font-size:13px">A full clean covers: ' + esc(def.daily.join("; ")) + '.</div>';
+      if(a.status === "none") h += '<div class="meta" style="font-size:13px">Checked. No cleaning was needed at the time.</div>';
+      (a.tasks || []).forEach(function(t){ h += '<div class="t"><span class="k">Done</span><span>' + esc(t.t) + (Number(t.n) > 1 ? ' <b>×' + esc(t.n) + '</b>' : '') + '</span></div>'; });
+      if(a.floors) h += '<div class="meta" style="font-size:13px;margin-top:6px">Floors: <b>' + esc(a.floors) + '</b></div>';
+      if(a.note) h += '<div class="meta" style="font-size:13px;margin-top:6px">Porter note: ' + esc(a.note) + '</div>';
+      h += '</div><div><div class="pgrid">' + a.photos.map(function(p){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div></div>'; }).join("") + '</div></div></div></div>';
+    });
+    if((d.rotation || []).length) h += '<div class="card plain"><h2 style="font-size:1rem">Weekly and monthly items done today</h2>' + d.rotation.map(function(r){ return '<div style="font-size:14px;padding:4px 0"><span style="color:var(--ok);font-weight:700;margin-right:8px">&#10003;</span>' + esc(r.t) + ' <small style="color:var(--grey)">(' + esc(r.area) + ')</small></div>'; }).join("") + '</div>';
+    if(offA.length) h += '<div class="card plain"><h2 style="font-size:1rem">Not reached today</h2><div class="meta">' + esc(offA.map(function(a){ return a.name; }).join(", ")) + '</div></div>';
+    if(d.followups || (d.followup_tags || []).length || (d.photos || []).length || d.supplies){
+      h += '<div class="card plain">';
+      if(d.followups || (d.followup_tags || []).length || (d.photos || []).length) h += '<h2 style="font-size:1rem">Reported to the property</h2>' + ((d.followup_tags || []).length ? '<div class="meta">' + d.followup_tags.map(esc).join(" · ") + '</div>' : '') + (d.followups ? '<p style="font-size:14px">' + esc(d.followups) + '</p>' : '') + ((d.photos || []).length ? '<div class="rarea" style="border:0"><div class="pgrid" style="grid-template-columns:repeat(4,1fr)">' + d.photos.map(function(p){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div></div>'; }).join("") + '</div></div>' : '');
+      if(d.supplies) h += '<h2 style="font-size:1rem;margin-top:14px">Supplies running low</h2><p style="font-size:14px">' + esc(d.supplies) + '</p>';
+      h += '</div>';
+    }
+    if(d.fsm_notes) h += '<div class="note info"><b>Note City Wide added for the property:</b> ' + esc(d.fsm_notes) + '</div>';
+  } else if(isCheck){
     var passes = (d.passes || []).filter(function(p){ return p.done; });
     if(passes.length) h += '<div class="card plain"><h2 style="font-size:1rem">Passes done</h2><div class="meta">' + passes.map(function(p){ return esc(p.t); }).join(" · ") + '</div></div>';
     (d.areas || []).forEach(function(a){

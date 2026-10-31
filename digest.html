@@ -84,17 +84,20 @@ header.top .tag{flex:1;min-width:0}
 <div class="bar">
 <a class="back" href="review.html">&larr; Review Queue</a>
 <div class="brands"><img class="cw" src="https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png" alt="City Wide Facility Solutions"><span class="div"></span><img class="ovl" src="ovation-logo.svg" alt="Ovation Property Management"></div>
-<div class="tag"><b>Weekly Digest</b>Unsent reports, by property</div>
+<div class="tag"><b>Digest</b>Reports by property, send or resend</div>
 <div class="who"><span>You:</span><input type="text" id="me" placeholder="Your name"></div>
 </div>
 </header>
 
 <main class="wrap">
-<h1>Create a weekly digest</h1>
-<div class="lead">Everything below has not gone to the property yet. Tick the days to include, check the addresses, send. One email per property, one PDF per day.</div>
-<div class="top-actions">
+<h1>Create a digest</h1>
+<div class="lead" id="lead">Everything below has not gone to the property yet. Tick the days to include, check the addresses, send. One email per property, one PDF per day. Switch to "Everything" to resend days or weeks that already went out.</div>
+<div class="top-actions" style="align-items:center">
+<select id="fmode" style="min-height:40px;width:auto;flex:0 0 auto"><option value="unsent">Not sent yet</option><option value="all">Everything, sent or not</option></select>
+<select id="frange" style="min-height:40px;width:auto;flex:0 0 auto"><option value="14">Last 2 weeks</option><option value="35">Last 5 weeks</option><option value="63">Last 9 weeks</option><option value="0">All time</option></select>
 <button type="button" class="btn ghost" id="refresh">Refresh</button>
-<button type="button" class="btn ghost" id="tickWeek">Tick everything from the last 7 days</button>
+<button type="button" class="btn ghost" id="tickWeek">Tick the last 7 days</button>
+<button type="button" class="btn ghost" id="tickRange">Tick everything shown</button>
 <button type="button" class="btn ghost" id="clear">Untick all</button>
 <span class="cnt" id="count"></span>
 <a class="btn ghost" href="recipients.html" style="margin-left:auto;text-decoration:none">Set recipients per property &rarr;</a>
@@ -117,7 +120,12 @@ $("me").addEventListener("change", function(){ try { localStorage.setItem("cwOps
 function toast(m, bad){ var t = document.createElement("div"); t.className = "toast"; if(bad) t.style.background = "#D22730"; t.textContent = m; document.body.appendChild(t); setTimeout(function(){ t.remove(); }, 3200); }
 
 function load(){
-  api("ov_digest_list").then(function(r){
+  var days = Number($("frange").value) || 0, all = $("fmode").value === "all";
+  $("lead").textContent = all
+    ? "Every report in the range, including ones already sent. Tick the days to include and send. A resend goes out the same way as the first send, one email per property, one PDF per day."
+    : "Everything below has not gone to the property yet. Tick the days to include, check the addresses, send. One email per property, one PDF per day. Switch to \"Everything\" to resend days or weeks that already went out.";
+  $("list").innerHTML = '<div class="empty"><div class="skel" style="width:40%;margin:0 auto 10px"></div><div class="skel" style="width:70%;margin:0 auto"></div></div>';
+  api("ov_digest_list", { all: all ? 1 : 0, since: days ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) : "" }).then(function(r){
     if(!r.ok) throw new Error(r.error);
     S.checks = r.checklists || []; S.reports = r.reports || [];
     S.props = {}; (r.properties || []).forEach(function(p){ S.props[p.property] = p; });
@@ -142,8 +150,8 @@ function paint(){
   var groups = byProp();
   var total = items().length - Object.keys(S.sent).length;
   var selN = Object.keys(S.sel).filter(function(k){ return S.sel[k] && !S.sent[k]; }).length;
-  $("count").textContent = total ? total + " unsent item" + (total === 1 ? "" : "s") + (selN ? ", " + selN + " ticked" : "") : "";
-  if(!groups.length){ $("list").innerHTML = '<div class="empty"><b>Nothing waiting.</b><br>Every checklist and report has been sent to its property.</div>'; return; }
+  $("count").textContent = total ? total + ($("fmode").value === "all" ? " item" : " unsent item") + (total === 1 ? "" : "s") + (selN ? ", " + selN + " ticked" : "") : "";
+  if(!groups.length){ $("list").innerHTML = '<div class="empty"><b>Nothing here.</b><br>' + ($("fmode").value === "all" ? "No reports in this time range. Pick a longer one." : "Every checklist and report in this range has been sent. Switch to \"Everything\" to resend one.") + '</div>'; return; }
   $("list").innerHTML = groups.map(function(g){
     var p = S.props[g.name] || {};
     var checks = g.list.filter(function(x){ return x.type === "checklist"; }).sort(function(a, b){ return String(b.service_date).localeCompare(String(a.service_date)) || String(b.created_at).localeCompare(String(a.created_at)); });
@@ -156,18 +164,19 @@ function paint(){
     function row(x){
       var isC = x.type === "checklist", sent = !!S.sent[x.id], on = !!S.sel[x.id] && !sent;
       var dateBig = isC ? x.day : OV.fmtDate(x.created_at);
-      var dateSmall = isC ? ("Checklist" + (dup[x.service_date] > 1 ? " (one of " + dup[x.service_date] + " that day)" : "") + (x.status !== "New" ? " · " + x.status : " · not yet approved")) : ((x.emergency ? "EMERGENCY · " : "") + (x.porter ? "Porter" : "Ovation") + " " + (/request/i.test(x.mode) ? "request" : "report") + (x.status !== "New" ? " · " + x.status : " · not yet reviewed"));
+      var already = x.status === "Sent" ? " · SENT " + (x.sent_at ? OV.fmtDate(x.sent_at) : "") : "";
+      var dateSmall = isC ? ("Checklist" + (dup[x.service_date] > 1 ? " (one of " + dup[x.service_date] + " that day)" : "") + (x.status === "Sent" ? already : x.status !== "New" ? " · " + x.status : " · not yet approved")) : ((x.emergency ? "EMERGENCY · " : "") + (x.porter ? "Porter" : "Ovation") + " " + (/request/i.test(x.mode) ? "request" : "report") + (x.status === "Sent" ? already : x.status !== "New" ? " · " + x.status : " · not yet reviewed"));
       var detail = isC
-        ? 'Porter <b>' + esc(x.porter) + '</b> · ' + esc(x.areas_done) + ' areas serviced · ' + esc(x.tasks_checked) + ' of ' + esc(x.tasks_total) + ' tasks · ' + esc(x.photos) + ' photos' + (x.followups ? '<br>Reported to the property: <b>' + esc(x.followups) + '</b>' : '') + (x.supplies ? '<br>Supplies low: ' + esc(x.supplies) : '')
+        ? 'Porter <b>' + esc(x.porter) + '</b> · ' + (x.focus ? esc(x.focus) : esc(x.areas_done) + ' areas serviced · ' + esc(x.tasks_checked) + ' of ' + esc(x.tasks_total) + ' tasks') + ' · ' + esc(x.photos) + ' photos' + (x.followups ? '<br>Reported to the property: <b>' + esc(x.followups) + '</b>' : '') + (x.supplies ? '<br>Supplies low: ' + esc(x.supplies) : '')
         : '<b>' + esc(x.mode) + (x.category ? ': ' + esc(x.category) : '') + '</b> from ' + esc(x.submitter) + (x.role ? ' (' + esc(x.role) + ')' : '') + (x.summary ? '<br>' + esc(x.summary) : '');
       return '<label class="row' + (on ? ' on' : '') + (sent ? ' sent' : '') + '" data-id="' + esc(x.id) + '"><input type="checkbox" data-sel="' + esc(x.id) + '"' + (on ? ' checked' : '') + (sent ? ' disabled' : '') + '>' +
         '<div class="date">' + esc(dateBig) + '<small>' + esc(dateSmall) + '</small></div><div class="d">' + detail + '</div>' +
-        (sent ? '<span class="pdf yes">Sent</span>' : (x.emergency ? '<span class="pdf em">Emergency</span>' : '') + '<span class="pdf' + (x.has_pdf ? ' yes' : '') + '">' + (x.has_pdf ? 'PDF ready' : 'PDF built on send') + '</span>') +
+        (sent ? '<span class="pdf yes">Sent just now</span>' : (x.emergency ? '<span class="pdf em">Emergency</span>' : '') + '<span class="pdf' + (x.has_pdf ? ' yes' : '') + '">' + (x.status === "Sent" ? 'Resend' : x.has_pdf ? 'PDF ready' : 'PDF built on send') + '</span>') +
         '<a class="open" href="review.html?t=' + (isC ? 'checklist' : 'report') + '&id=' + encodeURIComponent(x.id) + '" target="_blank" rel="noopener" data-open="1">Open &rarr;</a></label>';
     }
     var busy = !!S.busy[g.name];
     var h = '<div class="prop" data-prop="' + esc(g.name) + '">' +
-      '<div class="ph"><div class="name">' + esc(g.name) + '<small>' + open.length + ' unsent · ' + (p.contact_email ? 'to ' + esc(p.contact_email) : '<span style="color:var(--red)">no property email on file yet</span>') + (p.fsm ? ' · FSM ' + esc(p.fsm) : '') + '</small></div>' +
+      '<div class="ph"><div class="name">' + esc(g.name) + '<small>' + open.length + ($("fmode").value === "all" ? ' in range' : ' unsent') + ' · ' + (p.contact_email ? 'to ' + esc(p.contact_email) : '<span style="color:var(--red)">no property email on file yet</span>') + (p.fsm ? ' · FSM ' + esc(p.fsm) : '') + '</small></div>' +
       '<span class="sel"><b>' + sel.length + '</b> ticked</span>' +
       '<label class="all"><input type="checkbox" data-all="' + esc(g.name) + '"' + (allOn ? ' checked' : '') + (open.length ? '' : ' disabled') + '>Select all</label></div>';
     if(checks.length) h += '<div class="sec">Daily checklists</div>' + checks.map(row).join("");
@@ -209,7 +218,7 @@ function paintCounts(){
     var btn = box.querySelector("[data-send]"); if(btn && !S.busy[name]){ btn.disabled = !sel.length; btn.textContent = "Send digest for " + name + (sel.length ? " (" + sel.length + ")" : ""); }
   });
   var total = items().length - Object.keys(S.sent).length;
-  $("count").textContent = total ? total + " unsent item" + (total === 1 ? "" : "s") + (selN ? ", " + selN + " ticked" : "") : "";
+  $("count").textContent = total ? total + ($("fmode").value === "all" ? " item" : " unsent item") + (total === 1 ? "" : "s") + (selN ? ", " + selN + " ticked" : "") : "";
 }
 function send(name){
   var list = items().filter(function(x){ return x.property === name; });
@@ -223,7 +232,9 @@ function send(name){
   if(sel.length > 14){ say("Tick 14 or fewer. Send the rest as a second digest.", "bad"); return; }
   var unbuilt = sel.filter(function(x){ return !x.has_pdf; }).length;
   var notReviewed = sel.filter(function(x){ return x.status === "New"; }).length;
+  var resend = sel.filter(function(x){ return x.status === "Sent"; }).length;
   var warn = [];
+  if(resend) warn.push(resend + " of these " + (resend === 1 ? "was" : "were") + " already sent to the property and will go again");
   if(notReviewed) warn.push(notReviewed + " of these " + (notReviewed === 1 ? "has" : "have") + " not been reviewed or approved yet");
   if(unbuilt) warn.push(unbuilt + " PDF" + (unbuilt === 1 ? "" : "s") + " will be built from the porter's own checklist, unedited");
   if(warn.length && !confirm("Send " + sel.length + " item" + (sel.length === 1 ? "" : "s") + " to " + to + "?\n\n" + warn.join(".\n") + ".\n\nOK to send as is?")) return;
@@ -251,7 +262,9 @@ function send(name){
   });
 }
 $("refresh").addEventListener("click", load);
+$("fmode").addEventListener("change", load); $("frange").addEventListener("change", load);
 $("clear").addEventListener("click", function(){ S.sel = {}; paint(); });
+$("tickRange").addEventListener("click", function(){ items().forEach(function(x){ if(!S.sent[x.id]) S.sel[x.id] = true; }); paint(); });
 $("tickWeek").addEventListener("click", function(){
   var since = Date.now() - 7 * 86400000;
   items().forEach(function(x){ if(S.sent[x.id]) return; var t = Date.parse(x.type === "checklist" ? (x.service_date + "T12:00:00") : x.created_at); S.sel[x.id] = !t || t >= since; });

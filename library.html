@@ -76,7 +76,7 @@ function paint(){
     var m = monthOf(r.service_date); if(m !== lastM){ h += '<div class="month">' + esc(m) + '</div>'; lastM = m; }
     var day = String(r.service_date || "").split("-")[2] || "";
     h += '<div class="row"><div class="d"><b>' + esc(day) + '</b><small>' + esc(String(r.weekday || "").slice(0, 3)) + '</small></div>' +
-      '<div class="t"><b>' + esc(r.property) + '</b><span>' + esc(r.porter) + ' · ' + r.areas_done + ' areas · ' + r.tasks_checked + '/' + r.tasks_total + ' tasks · ' + r.photos + ' photo' + (r.photos == 1 ? "" : "s") + '</span></div>' +
+      '<div class="t"><b>' + esc(r.property) + '</b><span>' + esc(r.porter) + ' · ' + (r.focus ? esc(r.focus) : r.areas_done + ' areas · ' + r.tasks_checked + '/' + r.tasks_total + ' tasks') + ' · ' + r.photos + ' photo' + (r.photos == 1 ? "" : "s") + '</span></div>' +
       (r.has_pdf ? '<button type="button" class="btn dark" data-pdf="' + esc(r.id) + '">Open PDF</button>' : '<div class="wait">' + (r.status === "Sent" ? "Sent" : "Waiting for City Wide review") + '</div>') + '</div>';
   });
   $("list").innerHTML = h;

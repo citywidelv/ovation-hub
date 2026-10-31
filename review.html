@@ -111,12 +111,13 @@ header.top .tag,header.top .tag b{white-space:nowrap;overflow:hidden;text-overfl
 <div class="tabs" id="tabs">
 <button type="button" class="chip on" data-t="checklist">Porter Checklists</button>
 <button type="button" class="chip" data-t="report">Reports &amp; Requests</button>
-<a class="chip on red" href="digest.html" style="margin-left:auto;text-decoration:none">Create a weekly digest &rarr;</a>
+<a class="chip on red" href="digest.html" style="margin-left:auto;text-decoration:none">Send or resend a digest &rarr;</a>
 <a class="chip" href="recipients.html" style="text-decoration:none">Digest recipients &rarr;</a>
 <a class="chip" href="index.html" style="text-decoration:none">Ovation Hub (client side) &rarr;</a>
 </div>
 <div class="filters">
-<select id="fstatus"><option value="New">New</option><option value="Reviewed">Reviewed</option><option value="Scheduled">Scheduled</option><option value="Done">Done</option><option value="Sent">Sent</option><option value="">All</option></select>
+<select id="fstatus"><option value="open">Not sent yet</option><option value="New">New</option><option value="Reviewed">Reviewed</option><option value="Scheduled">Scheduled</option><option value="Done">Done</option><option value="Sent">Sent to the property</option><option value="">Everything</option></select>
+<select id="frange"><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last 12 months</option><option value="0">All time</option></select>
 <select id="fprop"><option value="">All properties</option></select>
 <button type="button" class="btn ghost sm" id="refresh">Refresh</button>
 <span id="count" style="font-size:12px;color:var(--grey)"></span>
@@ -155,9 +156,13 @@ function load(){
   $("list").innerHTML = '<div class="empty">Loading...</div>';
   var cacheKey = "cwOvQueue_" + S.type;
   try { var c = JSON.parse(localStorage.getItem(cacheKey) || "null"); if(c && c.length){ S.rows = c; paintList(); } } catch(e){}
-  api("ov_list", { type:S.type, status:$("fstatus").value, property:$("fprop").value }).then(function(r){
+  var st = $("fstatus").value, days = Number($("frange").value) || 0;
+  var since = days ? new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) : "";
+  api("ov_list", { type:S.type, status: st === "open" ? "" : st, property:$("fprop").value, since:since, limit:2000 }).then(function(r){
     if(!r.ok) throw new Error(r.error);
     S.rows = r.rows || [];
+    if(st === "open") S.rows = S.rows.filter(function(x){ return String(x.status || "New") !== "Sent"; });
+    if(S.type === "checklist") S.rows.sort(function(a, b){ return String(b.service_date + b.created_at).localeCompare(String(a.service_date + a.created_at)); });
     try { localStorage.setItem(cacheKey, JSON.stringify(S.rows.slice(0, 60))); } catch(e){}
     if(r.url){ $("bookLink").href = r.url; $("bookLink").style.display = ""; }
     paintList();
@@ -167,19 +172,19 @@ function load(){
 function paintList(){
   var rows = S.rows;
   $("count").textContent = rows.length + " item" + (rows.length === 1 ? "" : "s");
-  if(!rows.length){ $("list").innerHTML = '<div class="empty">Nothing here. Change the status filter to see more.</div>'; return; }
+  if(!rows.length){ $("list").innerHTML = '<div class="empty">Nothing here. Change the status or the time range to see more. Sent reports never go away.</div>'; return; }
   $("list").innerHTML = rows.map(function(r){
     var m = S.type === "checklist"
-      ? [esc(r.weekday) + " " + esc(r.service_date), esc(r.porter), r.areas_done + " areas", r.photos + " photos"]
+      ? [esc(r.weekday) + " " + esc(r.service_date), esc(r.porter), r.areas_done + " areas", r.photos + " photos", r.sent_at ? "sent " + esc(OV.fmtDate(r.sent_at)) : ""]
       : [OV.fmtDate(r.created_at), esc(r.mode) + (r.category ? " · " + esc(r.category) : ""), esc(r.submitter), r.urgency ? "<b>" + esc(r.urgency) + "</b>" : ""];
     return '<button type="button" class="item' + (S.cur === r.id ? ' on' : '') + '" data-id="' + esc(r.id) + '"><b>' + esc(r.property) + '</b><div class="m">' + pill(r.status) + m.filter(Boolean).map(function(x){ return '<span>' + x + '</span>'; }).join("") + '</div>' + (S.type === "report" && r.summary ? '<div class="m" style="color:var(--black)">' + esc(String(r.summary).slice(0, 110)) + '</div>' : '') + '</button>';
   }).join("");
   $("list").querySelectorAll(".item").forEach(function(b){ b.addEventListener("click", function(){ openItem(b.getAttribute("data-id"), S.rows.filter(function(x){ return x.id === b.getAttribute("data-id"); })[0]); }); });
 }
 $("tabs").querySelectorAll(".chip[data-t]").forEach(function(b){ b.addEventListener("click", function(){ S.type = b.getAttribute("data-t"); $("tabs").querySelectorAll(".chip[data-t]").forEach(function(x){ x.classList.toggle("on", x === b); }); S.cur = null; $("detail").innerHTML = '<div class="card plain"><div class="empty">Pick an item on the left.</div></div>'; load(); }); });
-$("fstatus").addEventListener("change", load); $("fprop").addEventListener("change", load); $("refresh").addEventListener("click", load);
+$("fstatus").addEventListener("change", load); $("frange").addEventListener("change", load); $("fprop").addEventListener("change", load); $("refresh").addEventListener("click", load);
 if(S.type === "report") $("tabs").querySelectorAll(".chip[data-t]").forEach(function(x){ x.classList.toggle("on", x.getAttribute("data-t") === "report"); });
-if(P.id) $("fstatus").value = "";
+if(P.id){ $("fstatus").value = ""; $("frange").value = "0"; }
 
 /* ---------- properties (recipients) ---------- */
 function loadProps(){ return S.props.length ? Promise.resolve(S.props) : api("ov_properties").then(function(r){ S.props = (r.properties || []); return S.props; }).catch(function(){ return []; }); }
@@ -209,12 +214,37 @@ function paintDetail(){
       ? esc(d.weekday) + ", " + esc(d.service_date) + " · Porter: <b>" + esc(d.porter) + "</b>" + (d.shift_start ? " · " + esc(d.shift_start) + (d.shift_end ? " to " + esc(d.shift_end) : "") : "") + " · submitted " + esc(OV.fmtDate(d.submitted_at || d.created_at))
       : esc(d.mode) + " · " + esc(d.category) + (d.subcategory ? " · " + esc(d.subcategory) : "") + " · from <b>" + esc(d.submitter) + "</b> (" + esc(d.role) + ") · " + esc(OV.fmtDate(d.created_at))) +
     '</div></div><div>' + pill(status()) + (d.reviewed_by ? '<div class="meta" style="margin-top:4px">' + (d.approved_by_manager ? 'Approved' : 'Reviewed') + ' by ' + esc(d.reviewed_by) + (d.manager_note ? ' · "' + esc(d.manager_note) + '"' : '') + '</div>' : '') + (S.index.sent_to ? '<div class="meta" style="margin-top:4px">Sent ' + esc(OV.fmtDate(S.index.sent_at)) + ' to ' + esc(S.index.sent_to) + '</div>' : '') + '</div></div>';
-  h += '<div class="actions"><button type="button" class="btn ghost" id="bSave">Save edits</button><button type="button" class="btn dark" id="bPdf">Build PDF</button><button type="button" class="btn" id="bSend">Send to property</button>' +
+  h += '<div class="actions"><button type="button" class="btn ghost" id="bSave">Save edits</button><button type="button" class="btn dark" id="bPdf">Build PDF</button><button type="button" class="btn" id="bSend">' + (status() === "Sent" ? "Resend to property" : "Send to property") + '</button>' +
     (status() === "New" ? '<button type="button" class="btn ghost" id="bRev">Mark reviewed</button>' : '') +
     (S.pdfUrl ? '<a class="btn ghost" href="' + esc(S.pdfUrl) + '" target="_blank" rel="noopener">Last PDF</a>' : '') + '</div>';
   h += '<div class="field"><label>City Wide notes <span class="hint" style="display:inline">(printed on the PDF)</span></label><textarea id="fsmNotes" placeholder="Anything the property should know from City Wide. Leave blank to print nothing.">' + esc(d.fsm_notes || "") + '</textarea></div>';
   h += '</div>';
-  if(isCheck){
+  if(isCheck && OV.isV2(d)){
+    /* v2: the porter reported areas, each with a kind of clean, how many times, and on a spot check what they touched */
+    var onN = (d.areas || []).filter(function(a){ return a.on; }).length;
+    h += '<div class="card plain"><h2 style="font-size:1rem">What the porter focused on</h2><div class="meta">' + onN + ' area' + (onN === 1 ? '' : 's') + ' reported. Areas the porter did not check off print under "Not reached today". Untick an area to leave it off the PDF, or tick one to add it.</div></div>';
+    (d.areas || []).forEach(function(a, ai){
+      var quick = OV.QUICK[a.key] || [];
+      h += '<div class="rarea' + (a.on ? '' : ' na') + '" data-ai="' + ai + '"><div class="rh"><b>' + esc(a.name) + '</b><span class="st">' + (a.on ? esc(OV.areaLine(a)) + ' · ' + a.photos.length + ' photo' + (a.photos.length === 1 ? '' : 's') : 'Not reached today') + '</span><button type="button" class="chip" style="min-height:32px;padding:5px 10px;font-size:12px" data-on="' + ai + '">' + (a.on ? 'Leave off PDF' : 'Add to PDF') + '</button></div>';
+      h += '<div class="rb"><div>';
+      h += '<div class="grp">Kind of clean</div><div class="chips">' + ["full", "spot", "none"].map(function(s){ return '<button type="button" class="chip' + (a.status === s ? ' on' : '') + '" style="min-height:34px;padding:5px 12px;font-size:12px" data-st="' + ai + ':' + s + '">' + esc(OV.STATUS_LABEL[s]) + '</button>'; }).join("") + '</div>';
+      h += '<div class="grp">Times today</div><div class="chips">' + OV.TIMES.map(function(t){ return '<button type="button" class="chip' + (a.times === t ? ' on' : '') + '" style="min-height:34px;padding:5px 12px;font-size:12px" data-tm="' + ai + ':' + t + '">' + t + '</button>'; }).join("") + '<button type="button" class="chip' + (!a.times ? ' on' : '') + '" style="min-height:34px;padding:5px 12px;font-size:12px" data-tm="' + ai + ':">not stated</button></div>';
+      if(a.status !== "none"){
+        h += '<div class="grp">' + (a.status === "full" ? "Called out (a full clean covers the whole area)" : "What the porter touched") + '</div>';
+        h += '<div class="chips">' + quick.map(function(t){ var hit = (a.tasks || []).filter(function(x){ return x.t === t; })[0]; var n = hit ? Number(hit.n) || 1 : 0; return '<button type="button" class="chip' + (n ? ' on' : '') + '" style="min-height:34px;padding:5px 12px;font-size:12px" data-tk="' + ai + '|' + esc(t) + '">' + esc(t) + (n > 1 ? ' ×' + n : '') + '</button>'; }).join("") + '</div>';
+      }
+      if(a.floors) h += '<div class="meta" style="font-size:13px;margin-top:6px">Floors: <b>' + esc(a.floors) + '</b></div>';
+      h += '<div class="field" style="margin:10px 0 0"><input type="text" data-note="' + ai + '" value="' + esc(a.note || "") + '" placeholder="Porter note for this area"></div>';
+      h += '</div><div><div class="pgrid">' + a.photos.map(function(p, pi){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div><button type="button" class="rm" data-rm="' + ai + ':' + pi + '" aria-label="Remove photo">&times;</button></div>'; }).join("") + '</div></div></div></div>';
+    });
+    if((d.rotation || []).length){
+      h += '<div class="card plain"><h2 style="font-size:1rem">Weekly and monthly items done today</h2><div class="chips">' + d.rotation.map(function(r, ri){ return '<span class="chip on" style="min-height:32px;padding:5px 10px;font-size:12px">' + esc(r.t) + ' <small style="opacity:.75">(' + esc(r.area) + ')</small> <button type="button" data-rmrot="' + ri + '" style="background:none;border:0;color:#fff;font-weight:700;margin-left:4px;cursor:pointer" aria-label="Remove">&times;</button></span>'; }).join("") + '</div></div>';
+    }
+    h += '<div class="card plain"><h2 style="font-size:1rem">Things to report to the property</h2>' + ((d.followup_tags || []).length ? '<div class="chips" style="margin-bottom:8px">' + d.followup_tags.map(function(t){ return '<span class="chip on red" style="min-height:30px;padding:4px 10px;font-size:12px">' + esc(t) + '</span>'; }).join("") + '</div>' : '') +
+      '<textarea id="fu">' + esc(d.followups || "") + '</textarea>' +
+      ((d.photos || []).length ? '<div class="rarea" style="margin-top:10px;border:0"><div class="pgrid" style="grid-template-columns:repeat(4,1fr)">' + d.photos.map(function(p, pi){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div><button type="button" class="rm" data-rmfu="' + pi + '">&times;</button></div>'; }).join("") + '</div></div>' : '') +
+      '<h2 style="font-size:1rem;margin-top:14px">Supplies running low</h2><textarea id="sup">' + esc(d.supplies || "") + '</textarea></div>';
+  } else if(isCheck){
     h += '<div class="card plain"><h2 style="font-size:1rem">Passes</h2>' + (d.passes || []).map(function(p, i){ return '<label class="check" style="min-height:36px;padding:6px 2px;font-size:13px"><input type="checkbox" data-pass="' + i + '"' + (p.done ? ' checked' : '') + '><span>' + esc(p.t) + '</span></label>'; }).join("") + '</div>';
     (d.areas || []).forEach(function(a, ai){
       var daily = a.tasks.filter(function(t){ return t.f === "daily"; }), done = daily.filter(function(t){ return t.done; }).length;
@@ -259,6 +289,12 @@ function wireDetail(){
   host.querySelectorAll("[data-task]").forEach(function(c){ c.addEventListener("change", function(){ var p = c.getAttribute("data-task").split(":"); d.areas[Number(p[0])].tasks[Number(p[1])].done = c.checked; c.closest(".check").classList.toggle("done", c.checked); mark(); }); });
   host.querySelectorAll("[data-note]").forEach(function(i){ i.addEventListener("input", function(){ d.areas[Number(i.getAttribute("data-note"))].note = i.value; mark(); }); });
   host.querySelectorAll("[data-na]").forEach(function(b){ b.addEventListener("click", function(){ var a = d.areas[Number(b.getAttribute("data-na"))]; a.na = !a.na; mark(); paintDetail(); }); });
+  /* v2 edits */
+  host.querySelectorAll("[data-on]").forEach(function(b){ b.addEventListener("click", function(){ var a = d.areas[Number(b.getAttribute("data-on"))]; a.on = !a.on; if(a.on && !a.status) a.status = "full"; mark(); paintDetail(); }); });
+  host.querySelectorAll("[data-st]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-st").split(":"); var a = d.areas[Number(p[0])]; a.status = p[1]; if(a.status === "none") a.tasks = []; mark(); paintDetail(); }); });
+  host.querySelectorAll("[data-tm]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-tm").split(":"); d.areas[Number(p[0])].times = p[1] || ""; mark(); paintDetail(); }); });
+  host.querySelectorAll("[data-tk]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-tk").split("|"); var a = d.areas[Number(p[0])]; a.tasks = a.tasks || []; var hit = a.tasks.filter(function(x){ return x.t === p[1]; })[0]; if(!hit) a.tasks.push({ t:p[1], n:1 }); else if(Number(hit.n) < 4) hit.n = (Number(hit.n) || 1) + 1; else a.tasks = a.tasks.filter(function(x){ return x !== hit; }); mark(); paintDetail(); }); });
+  host.querySelectorAll("[data-rmrot]").forEach(function(b){ b.addEventListener("click", function(){ d.rotation.splice(Number(b.getAttribute("data-rmrot")), 1); mark(); paintDetail(); }); });
   host.querySelectorAll("[data-rm]").forEach(function(b){ b.addEventListener("click", function(){ if(!confirm("Remove this photo from the report? It is deleted when you save.")) return; var p = b.getAttribute("data-rm").split(":"); var ph = d.areas[Number(p[0])].photos.splice(Number(p[1]), 1)[0]; (S.drop = S.drop || []).push(ph.pid); mark(); paintDetail(); }); });
   host.querySelectorAll("[data-rmfu]").forEach(function(b){ b.addEventListener("click", function(){ if(!confirm("Remove this photo? It is deleted when you save.")) return; var ph = d.photos.splice(Number(b.getAttribute("data-rmfu")), 1)[0]; (S.drop = S.drop || []).push(ph.pid); mark(); paintDetail(); }); });
   var fu = $("fu"); if(fu) fu.addEventListener("input", function(){ d.followups = fu.value; mark(); });
@@ -374,7 +410,50 @@ function buildPdf(open){
     }
 
     header();
-    if(isCheck){
+    if(isCheck && OV.isV2(d)){
+      h1(d.property);
+      var pv = OV.byName(d.property);
+      var areasOn = (d.areas || []).filter(function(a){ return a.on; });
+      var full = areasOn.filter(function(a){ return a.status === "full"; }).length, spot = areasOn.filter(function(a){ return a.status === "spot"; }).length, chk = areasOn.filter(function(a){ return a.status === "none"; }).length;
+      var sumBits = []; if(full) sumBits.push(full + " full clean" + (full > 1 ? "s" : "")); if(spot) sumBits.push(spot + " spot check" + (spot > 1 ? "s" : "")); if(chk) sumBits.push(chk + " checked, no cleaning needed");
+      meta([["Date", d.weekday + ", " + d.service_date], ["Address", pv ? pv.address : ""], ["Porter", d.porter], ["Shift", d.shift_start ? d.shift_start + (d.shift_end ? " to " + d.shift_end : "") : ""], ["Areas reported", areasOn.length + " of " + (d.areas || []).length + (sumBits.length ? " (" + sumBits.join(", ") + ")" : "")]]);
+      if(d.fsm_notes){ section("Note from City Wide"); para(d.fsm_notes); }
+      areasOn.forEach(function(a){
+        var def = OV.AREAS.filter(function(x){ return x.key === a.key; })[0] || { daily:[] };
+        var pids = a.photos.map(function(x){ return x.pid; }).filter(function(pid){ return S.photos[pid]; });
+        var lines = [];
+        if(a.status === "full") lines.push({ t: "A full clean covers: " + def.daily.join("; ") + ".", grey:true });
+        if(a.status === "none") lines.push({ t: "Checked. No cleaning was needed at the time.", grey:true });
+        (a.tasks || []).forEach(function(t){ lines.push({ t: t.t + (Number(t.n) > 1 ? "  (" + t.n + " times)" : ""), box:true }); });
+        if(a.floors) lines.push({ t: "Floors: " + a.floors });
+        var photoH = 0; pids.forEach(function(pid){ var s = sizes[pid] || { w:4, h:3 }; var hh = 58 * s.h / s.w; if(hh > 48) hh = 48; photoH += hh + 2; });
+        need(Math.min(Math.max(lines.length * 5 + (a.note ? 10 : 0) + 6, photoH) + 10, 120));
+        section(a.name, OV.areaLine(a));
+        var top = y, colW = pids.length ? W - M * 2 - 64 : W - M * 2;
+        pdf.setFontSize(9);
+        lines.forEach(function(l){
+          need(5);
+          var x0 = M;
+          if(l.box){ box(M, y, true); x0 = M + 5; }
+          pdf.setFont("helvetica", "normal"); var c = l.grey ? GREY : BLACK; pdf.setTextColor(c[0], c[1], c[2]);
+          var tl = pdf.splitTextToSize(l.t, colW - (x0 - M)); pdf.text(tl, x0, y); y += 4.6 * tl.length;
+        });
+        if(a.note){ need(6); pdf.setFont("helvetica", "italic"); pdf.setFontSize(9); pdf.setTextColor(GREY[0], GREY[1], GREY[2]); var nl2 = pdf.splitTextToSize("Note: " + a.note, colW); pdf.text(nl2, M, y); y += 4.6 * nl2.length; }
+        if(pids.length){ var endY2 = photoBlock(pids, W - M - 58, 58, top); if(endY2 > y) y = endY2; }
+        y += 3;
+      });
+      if((d.rotation || []).length){ section("Weekly and monthly items done today"); pdf.setFontSize(9); d.rotation.forEach(function(r){ need(5); box(M, y, true); pdf.setFont("helvetica", "normal"); pdf.setTextColor(BLACK[0], BLACK[1], BLACK[2]); var rl = pdf.splitTextToSize(r.t + "  (" + r.area + ")", W - M * 2 - 6); pdf.text(rl, M + 5, y); y += 4.6 * rl.length; }); y += 2; }
+      var notReached = (d.areas || []).filter(function(a){ return !a.on; });
+      if(notReached.length){ section("Not reached today"); para(notReached.map(function(a){ return a.name; }).join(", "), 9, GREY); }
+      if(d.followups || (d.followup_tags || []).length || (d.photos || []).length){
+        section("Reported to the property");
+        if((d.followup_tags || []).length) para(d.followup_tags.join(" · "), 9.5);
+        para(d.followups);
+        var fpids2 = (d.photos || []).map(function(x){ return x.pid; }).filter(function(pid){ return S.photos[pid]; });
+        if(fpids2.length){ need(50); var xx = M; fpids2.forEach(function(pid){ var s = sizes[pid] || { w:4, h:3 }; var hh = 44, ww = hh * s.w / s.h; if(ww > 60){ ww = 60; hh = ww * s.h / s.w; } if(xx + ww > W - M){ xx = M; y += 46; need(50); } try { pdf.addImage(S.photos[pid], "JPEG", xx, y, ww, hh); } catch(e){} xx += ww + 3; }); y += 48; }
+      }
+      if(d.supplies){ section("Supplies running low"); para(d.supplies); }
+    } else if(isCheck){
       h1(d.property);
       var p = OV.byName(d.property);
       var passesDone = (d.passes || []).filter(function(x){ return x.done; }).map(function(x){ return x.t.replace(/\s*\(.*\)$/, ""); });
@@ -434,11 +513,12 @@ function sendDialog(){
     var rec = propRec(d.property) || {};
     var subj = (S.type === "checklist" ? "Day porter service report - " + d.property + " - " + d.weekday + " " + d.service_date : "City Wide - " + d.property + " - " + d.category);
     var msg = S.type === "checklist"
-      ? "Hello,\n\nAttached is the day porter service report for " + d.property + " for " + d.weekday + ", " + d.service_date + ". It shows the areas serviced, the tasks completed and photos from the shift." + (d.followups ? "\n\nItems reported to the property: " + d.followups : "") + "\n\nReply to this email with any questions.\n\nThank you,\nCity Wide Facility Solutions"
+      ? "Hello,\n\nAttached is the day porter service report for " + d.property + " for " + d.weekday + ", " + d.service_date + ". It shows the areas the porter focused on, the kind of clean each one got and photos from the shift." + (d.followups ? "\n\nItems reported to the property: " + d.followups : "") + "\n\nReply to this email with any questions.\n\nThank you,\nCity Wide Facility Solutions"
       : "Hello " + (d.submitter || "").split(" ")[0] + ",\n\nAttached is the summary of your " + (/request/i.test(d.mode) ? "request" : "report") + " for " + d.property + (d.response ? " and City Wide's response." : ".") + "\n\nReply to this email with any questions.\n\nThank you,\nCity Wide Facility Solutions";
     var to = S.type === "report" ? (d.email || rec.contact_email || "") : (rec.contact_email || "");
     var m = document.createElement("div"); m.className = "modal";
-    m.innerHTML = '<div class="box"><h3>Send to the property</h3>' +
+    m.innerHTML = '<div class="box"><h3>' + (status() === "Sent" ? "Resend to the property" : "Send to the property") + '</h3>' +
+      (status() === "Sent" && S.index.sent_at ? '<div class="note info">Already sent ' + esc(OV.fmtDate(S.index.sent_at)) + ' to ' + esc(S.index.sent_to || "") + '. Sending again is fine.</div>' : '') +
       (S.pdf ? '<div class="note ok">PDF built: ' + esc(S.pdfName) + '</div>' : '<div class="note info">The PDF is built fresh when you send.</div>') +
       '<div class="field"><label>To</label><input type="text" id="mTo" value="' + esc(to) + '" placeholder="manager@ovationco.com, second@ovationco.com"></div>' +
       '<div class="field"><label>CC</label><input type="text" id="mCc" value="' + esc(rec.cc_email || "") + '" placeholder="Optional"></div>' +

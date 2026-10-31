@@ -4,14 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Porter Daily Checklist | Ovation Hub</title>
-<!-- build 2026-10-22d: co-branded header.
-     build 2026-10-22c: photos are asked for, not forced (warning before submit lists areas with none, Submit without photos allowed); photo button offers camera or library; "Picking up where you left off" note when a saved draft restores.
-     build 2026-10-22b: Start over button (two taps) clears the draft, the saved photos and every field.
-     build 2026-10-22: Porter Daily Checklist for the awarded Ovation properties. Areas and tasks come
-     from the Aspire at Redwood day porter workflow (OV.AREAS in ov-shared.js). 1 to 2 photos per area.
-     Saves to the phone as the porter works (localStorage + IndexedDB photos), then kind ov_submit and
-     ov_photo_put one photo at a time. No email. The FSM reviews it in review.html. -->
+<title>Porter Daily Report | Ovation Hub</title>
+<!-- build 2026-10-30 (checklist v2, from TJ, Robert and Luigi): the passes are gone and nothing is
+     required area by area. The porter checks off the areas they got to today (box on the right),
+     says whether each was a full clean, a spot check or did not need cleaning, and can say how
+     many times they got to it (blank unless they do). On a spot check a short list of what they
+     touched, each with a +1 for repeats. Weekly and monthly items are one pooled list at the end.
+     Photos stay 1 to 2 per area; the only warning before submit is when there are no photos at all.
+     Saves to the phone as the porter works (localStorage + IndexedDB photos), then kind ov_submit
+     and ov_photo_put one photo at a time. No email. The FSM reviews it in review.html.
+     Submission shape: v:2, areas[].on / status / times / tasks[{t,n}] / note / floors / photos,
+     rotation[{t,area}]. Old submissions (no v) keep the task-list shape and still render. -->
 <link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
 <link rel="stylesheet" href="ov.css">
 <style>
@@ -19,6 +22,34 @@
 .day b{color:var(--black)}
 .quick{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
 .quick .chip{font-size:13px;min-height:38px;padding:7px 12px}
+/* area rows: name left, big check box right */
+.area .ahead{cursor:pointer}
+.area .ahead .box{width:30px;height:30px;border:2px solid var(--grey);border-radius:8px;flex:0 0 30px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#fff;background:#fff;margin-left:auto}
+.area.on .ahead .box{background:var(--red);border-color:var(--red)}
+.area.on .ahead .num{background:var(--red);color:#fff}
+.area .ahead .st{margin-left:0}
+.area.closed .abody{display:none}
+.area.on .ahead .t b{color:var(--black)}
+.area .ahead .t small.ok{color:var(--ok);font-weight:700}
+.area .ahead .t small.need{color:var(--red);font-weight:700}
+.area:not(.on) .ahead .num{background:#bbb}
+.q{font-size:14px;font-weight:700;margin:12px 0 6px}
+.q small{display:block;font-weight:400;color:var(--grey);font-size:12px;margin-top:2px}
+.stat{display:flex;gap:8px;flex-wrap:wrap}
+.stat .chip{flex:1 1 30%;justify-content:center;text-align:center;min-height:46px;font-size:14px}
+.times{display:flex;gap:8px;flex-wrap:wrap}
+.times .chip{min-width:54px;justify-content:center;min-height:42px}
+.tasks2 .trow{display:flex;align-items:center;gap:8px;margin:0 0 8px}
+.tasks2 .trow .chip{flex:1;justify-content:flex-start;min-height:42px}
+.tasks2 .trow .n{display:none;align-items:center;gap:4px}
+.tasks2 .trow.on .n{display:inline-flex}
+.tasks2 .trow .n b{min-width:34px;text-align:center;font-size:14px}
+.tasks2 .trow .n button{width:40px;height:40px;border-radius:50%;border:1px solid var(--border);background:#fff;font-size:18px;font-weight:700;color:var(--black)}
+.more{font-size:13px;color:var(--grey);text-decoration:underline;background:none;border:0;padding:6px 0;cursor:pointer}
+.rot .check{font-size:14px}
+.rot .check small{display:block;color:var(--grey);font-size:12px}
+.rot .grp{font-size:12px;font-weight:700;color:var(--grey);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 4px}
+.summary-line{font-size:13px;color:var(--grey);margin:4px 0 0}
 </style>
 <link rel="stylesheet" href="https://citywidelv.github.io/cw-base.css">
 </head>
@@ -27,13 +58,13 @@
 <div class="bar">
 <a class="back" href="porter.html">&larr; Porter Desk</a>
 <div class="brands"><img class="cw" src="https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png" alt="City Wide Facility Solutions"><span class="div"></span><img class="ovl" src="ovation-logo.svg" alt="Ovation Property Management"></div>
-<div class="tag"><b>Porter Daily Checklist</b>Ovation Hub</div>
+<div class="tag"><b>Porter Daily Report</b>Ovation Hub</div>
 </div>
 </header>
 
 <main class="wrap" id="form">
-<h1>Porter Daily Checklist</h1>
-<div class="lead">Work through the areas, tick what you did, add 1 or 2 photos per area. Everything saves on this phone as you go, so you can come back to it through the day.</div>
+<h1>Porter Daily Report</h1>
+<div class="lead">What did you get to today? Check off the areas you worked in, say what kind of clean it was, and add a photo or two. Nothing else is required. Everything saves on this phone as you go.</div>
 
 <div id="resume"></div>
 
@@ -51,14 +82,15 @@
 </div>
 </div>
 
-<div class="card black" id="passesCard">
-<h2>Passes completed</h2>
-<div class="sub">The order of the day from the scope of work.</div>
-<div id="passes"></div>
-</div>
-
-<h2 style="margin:18px 0 8px">Areas</h2>
+<h2 style="margin:18px 0 4px">What did you focus on today?</h2>
+<div class="sub" style="margin:0 0 10px;font-size:13px;color:var(--grey)">Tap the box on the right for each area you got to. Leave the rest alone.</div>
 <div id="areas"></div>
+
+<div class="card plain rot">
+<h2>Weekly and monthly items done today</h2>
+<div class="sub">Only tick what you did today. Skip this if none.</div>
+<div id="rotation"></div>
+</div>
 
 <div class="card plain">
 <h2>Things to report to the property</h2>
@@ -74,24 +106,24 @@
 </div>
 
 <div class="card plain">
-<label class="check" style="border:0"><input type="checkbox" id="confirm"><span>The tasks I checked above were completed today, and the photos are from this shift.</span></label>
+<label class="check" style="border:0"><input type="checkbox" id="confirm"><span>This is what I did today, and the photos are from this shift.</span></label>
 <div class="err" id="ferr"></div>
 </div>
 <input type="file" id="pfile" accept="image/*" class="hidden">
 </main>
 
 <div class="sticky" id="bar">
-<div class="in"><div class="st" id="barst">0 of 0 areas done</div><button class="btn" id="submit">Submit checklist</button></div>
+<div class="in"><div class="st" id="barst">0 areas reported</div><button class="btn" id="submit">Submit report</button></div>
 </div>
 
 <main class="wrap hidden" id="doneWrap">
 <div class="card plain done">
 <div class="big">&#10003;</div>
-<h2>Checklist submitted</h2>
+<h2>Report submitted</h2>
 <p id="doneText"></p>
 <div id="donePhotos"></div>
 <div class="kv" style="justify-content:center;margin:14px 0"><span>Reference <span class="ref" id="doneRef"></span></span></div>
-<div class="btnrow"><a class="btn dark" href="checklist.html">Start tomorrow's checklist</a><a class="btn ghost" href="porter.html">Back to the Porter Desk</a></div>
+<div class="btnrow"><a class="btn dark" href="checklist.html">Start tomorrow's report</a><a class="btn ghost" href="porter.html">Back to the Porter Desk</a></div>
 </div>
 </main>
 
@@ -100,23 +132,22 @@
 (function(){
 var $ = OV.$, esc = OV.esc;
 if(!OV.require()) return;
-var AREAS = OV.AREAS;
+var AREAS = OV.AREAS, QUICK = OV.QUICK, ROTATION = OV.ROTATION, TIMES = OV.TIMES;
 var FU = ["Light out", "Damage", "Graffiti", "Safety hazard", "Dumpster overflow", "Dumpster access blocked", "Pest activity", "Signage missing or damaged", "Water leak", "Pool or gate issue"];
 
 /* ---------- state ---------- */
 function blank(){
-  return { id: OV.uid("ovc_"), property:"", service_date: OV.today(), weekday:"", porter:"", shift_start:"", shift_end:"",
-    passes: OV.PASSES.map(function(p){ return { t:p, done:false }; }),
-    areas: AREAS.map(function(a){ return { key:a.key, name:a.name, na:false, note:"", floors:"",
-      tasks: a.daily.map(function(t){ return { t:t, done:false, f:"daily" }; }).concat((a.weekly || []).map(function(t){ return { t:t, done:false, f:"weekly" }; })).concat((a.monthly || []).map(function(t){ return { t:t, done:false, f:"monthly" }; })),
-      photos: [] }; }),
+  return { id: OV.uid("ovc_"), v:2, property:"", service_date: OV.today(), weekday:"", porter:"", shift_start:"", shift_end:"",
+    areas: AREAS.map(function(a){ return { key:a.key, name:a.name, on:false, status:"", times:"", tasks:[], note:"", floors:"", photos:[] }; }),
+    rotation: [],
     followups:"", followup_tags:[], photos:[], supplies:"", status:"New" };
 }
 var RESTORED = OV.loadDraft("checklist");
 var S = RESTORED || blank();
-if(!S.id || !/^ovc_/.test(S.id)){ S = blank(); RESTORED = null; }
+/* a draft from the old checklist shape cannot be finished here; start clean */
+if(!S.id || !/^ovc_/.test(S.id) || Number(S.v) < 2){ S = blank(); RESTORED = null; }
 var THUMBS = {};   /* pid -> thumb data uri, memory only */
-var open = {};     /* area key -> expanded */
+var moreOpen = {}; /* area key -> full task list shown */
 
 var saveT = null;
 function persist(){ clearTimeout(saveT); saveT = setTimeout(function(){ OV.saveDraft("checklist", S); }, 200); }
@@ -126,11 +157,7 @@ $("prop").innerHTML = OV.propertyOptions(true);
 $("prop").value = S.property; $("date").value = S.service_date || OV.today(); $("porter").value = S.porter || (function(){ try { return localStorage.getItem("cwOvPorter") || ""; } catch(e){ return ""; } })();
 $("start").value = S.shift_start || ""; $("end").value = S.shift_end || "";
 function dayline(){ S.weekday = OV.weekday($("date").value); $("dayline").innerHTML = S.weekday ? "<b>" + esc(S.weekday) + "</b>" + (S.property ? " at " + esc(S.property) : "") : ""; }
-function applyPropertyDefaults(){
-  var p = OV.byName(S.property);
-  S.areas.forEach(function(a){ var def = AREAS.filter(function(x){ return x.key === a.key; })[0]; if(def && def.midOnly && !a._touched) a.na = !(p && p.type === "mid"); });
-}
-$("prop").addEventListener("change", function(){ S.property = $("prop").value; applyPropertyDefaults(); dayline(); renderAreas(); persist(); });
+$("prop").addEventListener("change", function(){ S.property = $("prop").value; dayline(); renderAreas(); persist(); });
 $("date").addEventListener("change", function(){ S.service_date = $("date").value; dayline(); persist(); });
 $("porter").addEventListener("input", function(){ S.porter = $("porter").value; persist(); });
 $("start").addEventListener("change", function(){ S.shift_start = $("start").value; persist(); });
@@ -139,13 +166,6 @@ $("followups").value = S.followups || ""; $("supplies").value = S.supplies || ""
 $("followups").addEventListener("input", function(){ S.followups = $("followups").value; persist(); });
 $("supplies").addEventListener("input", function(){ S.supplies = $("supplies").value; persist(); });
 dayline();
-
-/* ---------- passes ---------- */
-function renderPasses(){
-  $("passes").innerHTML = S.passes.map(function(p, i){ return '<label class="check' + (p.done ? ' done' : '') + '"><input type="checkbox" data-i="' + i + '"' + (p.done ? ' checked' : '') + '><span>' + esc(p.t) + '</span></label>'; }).join("");
-  $("passes").querySelectorAll("input").forEach(function(c){ c.addEventListener("change", function(){ S.passes[Number(c.getAttribute("data-i"))].done = c.checked; renderPasses(); persist(); }); });
-}
-renderPasses();
 
 /* ---------- follow-up chips ---------- */
 function renderFu(){
@@ -156,71 +176,90 @@ renderFu();
 
 /* ---------- areas ---------- */
 function areaDef(key){ return AREAS.filter(function(a){ return a.key === key; })[0]; }
-function areaState(a){
+function find(key){ return S.areas.filter(function(a){ return a.key === key; })[0]; }
+function visible(a){
   var def = areaDef(a.key);
-  if(a.na) return { cls:"na", st:"Not today", ok:true };
-  var daily = a.tasks.filter(function(t){ return t.f === "daily"; });
-  var done = daily.filter(function(t){ return t.done; }).length;
-  var wantPhoto = !def.photoOptional && a.photos.length < 1;
-  var complete = done === daily.length;
-  var st = done + "/" + daily.length + (a.photos.length ? " · " + a.photos.length + " photo" + (a.photos.length > 1 ? "s" : "") : (wantPhoto ? " · add a photo" : ""));
-  return { cls: complete ? "complete" : "", st:st, ok:complete, need: (done > 0 && done < daily.length) || (complete && wantPhoto) };
+  if(!def.midOnly) return true;
+  var p = OV.byName(S.property);
+  return !p || p.type === "mid" || a.on;
+}
+function taskN(a, t){ var hit = (a.tasks || []).filter(function(x){ return x.t === t; })[0]; return hit ? Number(hit.n) || 1 : 0; }
+function setTask(a, t, n){
+  a.tasks = (a.tasks || []).filter(function(x){ return x.t !== t; });
+  if(n > 0) a.tasks.push({ t:t, n:n });
+}
+function headStatus(a){
+  if(!a.on) return { cls:"", st:"" };
+  var bits = [];
+  if(a.status) bits.push(OV.STATUS_LABEL[a.status].replace("Checked, no cleaning needed", "No cleaning needed"));
+  if(a.times) bits.push(a.times === "1" ? "once" : a.times === "2" ? "twice" : a.times + " times");
+  if(a.photos.length) bits.push(a.photos.length + " photo" + (a.photos.length > 1 ? "s" : ""));
+  return { cls: a.status ? "ok" : "need", st: bits.join(" · ") || "Pick what kind of clean" };
 }
 function renderAreas(){
   var host = $("areas");
-  host.innerHTML = S.areas.map(function(a, idx){
-    var def = areaDef(a.key), s = areaState(a), isOpen = !!open[a.key];
-    var h = '<div class="area ' + s.cls + (isOpen ? '' : ' closed') + '" data-k="' + a.key + '">';
-    h += '<div class="ahead" data-toggle="' + a.key + '"><div class="num">' + (idx + 1) + '</div><div class="t"><b>' + esc(a.name) + '</b>' + (def.sub ? '<small>' + esc(def.sub) + '</small>' : '') + '</div><div class="st ' + (s.ok ? 'ok' : (s.need ? 'need' : '')) + '">' + esc(s.st) + '</div></div>';
+  host.innerHTML = S.areas.filter(visible).map(function(a, idx){
+    var def = areaDef(a.key), hs = headStatus(a);
+    var h = '<div class="area' + (a.on ? ' on' : ' closed') + '" data-k="' + a.key + '">';
+    h += '<div class="ahead" data-toggle="' + a.key + '"><div class="num">' + (idx + 1) + '</div><div class="t"><b>' + esc(a.name) + '</b>' + (hs.st ? '<small class="' + hs.cls + '">' + esc(hs.st) + '</small>' : (def.sub ? '<small>' + esc(def.sub) + '</small>' : '')) + '</div><div class="box">' + (a.on ? '&#10003;' : '') + '</div></div>';
     h += '<div class="abody">';
-    h += '<div class="tools"><button type="button" class="chip' + (a.na ? ' on' : '') + '" data-na="' + a.key + '">' + (a.na ? 'Not at this property / not today' : 'Not at this property / not today') + '</button>';
-    if(!a.na) h += '<button type="button" class="chip" data-all="' + a.key + '">Check all daily tasks</button>';
-    h += '</div>';
-    if(!a.na){
-      h += '<div class="tasks">';
-      ["daily","weekly","monthly"].forEach(function(f){
-        var list = a.tasks.map(function(t, i){ return { t:t, i:i }; }).filter(function(x){ return x.t.f === f; });
-        if(!list.length) return;
-        h += '<div class="grp">' + (f === "daily" ? "Each shift" : f === "weekly" ? "Weekly, tick if done today" : "Monthly, tick if done today") + '</div>';
-        list.forEach(function(x){ h += '<label class="check' + (x.t.done ? ' done' : '') + '"><input type="checkbox" data-task="' + a.key + ':' + x.i + '"' + (x.t.done ? ' checked' : '') + '><span>' + esc(x.t.t) + '</span></label>'; });
-      });
-      if(def.askFloors) h += '<div class="field" style="margin-top:10px"><label>Which hallway floors did you do today?</label><input type="text" data-floors="' + a.key + '" value="' + esc(a.floors || "") + '" placeholder="Building 1 floors 2 and 3"></div>';
-      h += '</div>';
-      h += '<div class="photos"><div class="grp">Photos' + (def.photoOptional ? ' (optional)' : ' (1 to 2)') + '</div><div class="pgrid">';
-      a.photos.forEach(function(p, i){ h += '<div class="ph"><img src="' + (THUMBS[p.pid] || "") + '" alt=""><button type="button" class="rm" data-rm="' + a.key + ':' + i + '" aria-label="Remove photo">&times;</button></div>'; });
-      if(a.photos.length < 2) h += '<div class="add' + (!def.photoOptional && !a.photos.length ? ' req' : '') + '" data-add="' + a.key + '"><span class="big">+</span>' + (a.photos.length ? 'Add 2nd photo' : 'Take or upload photo') + '</div>';
-      h += '</div></div>';
-      h += '<div class="field" style="margin-top:10px"><label>Note for this area (optional)</label><input type="text" data-note="' + a.key + '" value="' + esc(a.note || "") + '" placeholder="Anything the property should know"></div>';
+    h += '<div class="q">What kind of clean was it?</div><div class="stat">' + ["full", "spot", "none"].map(function(s){ return '<button type="button" class="chip' + (a.status === s ? ' on' : '') + '" data-status="' + a.key + ':' + s + '">' + (s === "full" ? "Full clean" : s === "spot" ? "Spot check" : "Did not need it") + '</button>'; }).join("") + '</div>';
+    h += '<div class="q">How many times did you get to this today?<small>Leave blank if once is all it needs. Tap a number if you went back.</small></div><div class="times">' + TIMES.map(function(t){ return '<button type="button" class="chip' + (a.times === t ? ' on' : '') + '" data-times="' + a.key + ':' + t + '">' + t + '</button>'; }).join("") + '</div>';
+    if(a.status === "spot" || a.status === "full"){
+      var list = QUICK[a.key] || [];
+      var showAll = !!moreOpen[a.key] || a.status === "spot";
+      h += '<div class="q">' + (a.status === "spot" ? "What did you touch?" : "Anything to call out?") + '<small>' + (a.status === "spot" ? "Tap what you did. Tap + if you did it more than once." : "Optional. A full clean already covers the whole area.") + '</small></div>';
+      if(showAll){
+        h += '<div class="tasks2">' + list.map(function(t){ var n = taskN(a, t); return '<div class="trow' + (n ? ' on' : '') + '"><button type="button" class="chip' + (n ? ' on' : '') + '" data-task="' + a.key + '|' + esc(t) + '">' + esc(t) + '</button><span class="n"><button type="button" data-minus="' + a.key + '|' + esc(t) + '" aria-label="One less">&minus;</button><b>&times;' + n + '</b><button type="button" data-plus="' + a.key + '|' + esc(t) + '" aria-label="One more">+</button></span></div>'; }).join("") + '</div>';
+      } else {
+        var picked = (a.tasks || []).map(function(x){ return x.t + (x.n > 1 ? " ×" + x.n : ""); });
+        h += (picked.length ? '<div class="summary-line">' + esc(picked.join(", ")) + '</div>' : '') + '<button type="button" class="more" data-more="' + a.key + '">' + (picked.length ? "Change" : "Add detail") + '</button>';
+      }
     }
+    if(def.askFloors) h += '<div class="field" style="margin-top:10px"><label>Which hallway floors did you do today?</label><input type="text" data-floors="' + a.key + '" value="' + esc(a.floors || "") + '" placeholder="Building 1 floors 2 and 3"></div>';
+    h += '<div class="photos"><div class="grp">Photos' + (def.photoOptional ? ' (optional)' : ' (1 to 2)') + '</div><div class="pgrid">';
+    a.photos.forEach(function(p, i){ h += '<div class="ph"><img src="' + (THUMBS[p.pid] || "") + '" alt=""><button type="button" class="rm" data-rm="' + a.key + ':' + i + '" aria-label="Remove photo">&times;</button></div>'; });
+    if(a.photos.length < 2) h += '<div class="add" data-add="' + a.key + '"><span class="big">+</span>' + (a.photos.length ? 'Add 2nd photo' : 'Take or upload photo') + '</div>';
+    h += '</div></div>';
+    h += '<div class="field" style="margin-top:10px"><label>Note for this area (optional)</label><input type="text" data-note="' + a.key + '" value="' + esc(a.note || "") + '" placeholder="Anything the property should know"></div>';
     h += '</div></div>';
     return h;
   }).join("");
   wire(); bar();
 }
-function find(key){ return S.areas.filter(function(a){ return a.key === key; })[0]; }
 function wire(){
   var host = $("areas");
-  host.querySelectorAll("[data-toggle]").forEach(function(el){ el.addEventListener("click", function(){ var k = el.getAttribute("data-toggle"); open[k] = !open[k]; el.parentNode.classList.toggle("closed", !open[k]); }); });
-  host.querySelectorAll("[data-na]").forEach(function(b){ b.addEventListener("click", function(){ var a = find(b.getAttribute("data-na")); a.na = !a.na; a._touched = true; renderAreas(); persist(); }); });
-  host.querySelectorAll("[data-all]").forEach(function(b){ b.addEventListener("click", function(){ var a = find(b.getAttribute("data-all")); a.tasks.forEach(function(t){ if(t.f === "daily") t.done = true; }); renderAreas(); persist(); }); });
-  host.querySelectorAll("[data-task]").forEach(function(c){ c.addEventListener("change", function(){ var p = c.getAttribute("data-task").split(":"); var a = find(p[0]); a.tasks[Number(p[1])].done = c.checked; c.closest(".check").classList.toggle("done", c.checked); refreshHead(a); persist(); }); });
+  host.querySelectorAll("[data-toggle]").forEach(function(el){ el.addEventListener("click", function(){ var a = find(el.getAttribute("data-toggle")); a.on = !a.on; if(!a.on){ a.status = ""; a.times = ""; a.tasks = []; } renderAreas(); persist(); if(a.on){ var box = host.querySelector('.area[data-k="' + a.key + '"]'); if(box) box.scrollIntoView({ behavior:"smooth", block:"start" }); } }); });
+  host.querySelectorAll("[data-status]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-status").split(":"); var a = find(p[0]); a.status = a.status === p[1] ? "" : p[1]; if(a.status === "none") a.tasks = []; renderAreas(); persist(); }); });
+  host.querySelectorAll("[data-times]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-times").split(":"); var a = find(p[0]); a.times = a.times === p[1] ? "" : p[1]; renderAreas(); persist(); }); });
+  host.querySelectorAll("[data-task]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-task").split("|"); var a = find(p[0]); setTask(a, p[1], taskN(a, p[1]) ? 0 : 1); renderAreas(); persist(); }); });
+  host.querySelectorAll("[data-plus]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-plus").split("|"); var a = find(p[0]); setTask(a, p[1], Math.min(9, taskN(a, p[1]) + 1)); renderAreas(); persist(); }); });
+  host.querySelectorAll("[data-minus]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-minus").split("|"); var a = find(p[0]); setTask(a, p[1], taskN(a, p[1]) - 1); renderAreas(); persist(); }); });
+  host.querySelectorAll("[data-more]").forEach(function(b){ b.addEventListener("click", function(){ moreOpen[b.getAttribute("data-more")] = true; renderAreas(); }); });
   host.querySelectorAll("[data-floors]").forEach(function(i){ i.addEventListener("input", function(){ find(i.getAttribute("data-floors")).floors = i.value; persist(); }); });
   host.querySelectorAll("[data-note]").forEach(function(i){ i.addEventListener("input", function(){ find(i.getAttribute("data-note")).note = i.value; persist(); }); });
   host.querySelectorAll("[data-add]").forEach(function(b){ b.addEventListener("click", function(){ pendingArea = b.getAttribute("data-add"); $("pfile").value = ""; $("pfile").click(); }); });
   host.querySelectorAll("[data-rm]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-rm").split(":"); var a = find(p[0]); var ph = a.photos.splice(Number(p[1]), 1)[0]; if(ph){ delete THUMBS[ph.pid]; OV.photoDrop(S.id + ":" + ph.pid); } renderAreas(); persist(); }); });
 }
-function refreshHead(a){
-  var el = $("areas").querySelector('.area[data-k="' + a.key + '"]'); if(!el) return;
-  var s = areaState(a); el.className = "area " + s.cls + (open[a.key] ? "" : " closed");
-  var st = el.querySelector(".ahead .st"); st.className = "st " + (s.ok ? "ok" : (s.need ? "need" : "")); st.textContent = s.st;
-  bar();
-}
 function counts(){
-  var done = 0, total = 0, photos = 0;
-  S.areas.forEach(function(a){ if(a.na) return; total++; if(areaState(a).ok) done++; photos += a.photos.length; });
-  return { done:done, total:total, photos: photos + (S.photos || []).length };
+  var on = 0, photos = 0;
+  S.areas.forEach(function(a){ if(a.on) on++; photos += a.photos.length; });
+  return { on:on, photos: photos + (S.photos || []).length };
 }
-function bar(){ var c = counts(); $("barst").textContent = c.done + " of " + c.total + " areas done · " + c.photos + " photo" + (c.photos === 1 ? "" : "s"); }
+function bar(){ var c = counts(); $("barst").textContent = c.on + " area" + (c.on === 1 ? "" : "s") + " reported · " + c.photos + " photo" + (c.photos === 1 ? "" : "s"); }
+
+/* ---------- rotation (weekly / monthly items, pooled) ---------- */
+function rotOn(r){ return (S.rotation || []).some(function(x){ return x.t === r.t && x.area === r.area; }); }
+function renderRotation(){
+  var h = "", last = "";
+  ROTATION.forEach(function(r){
+    if(r.area !== last){ h += '<div class="grp">' + esc(r.area) + '</div>'; last = r.area; }
+    h += '<label class="check' + (rotOn(r) ? ' done' : '') + '"><input type="checkbox" data-rot="' + esc(r.t) + '|' + esc(r.area) + '"' + (rotOn(r) ? ' checked' : '') + '><span>' + esc(r.t) + '<small>' + (r.f === "weekly" ? "weekly" : "monthly") + '</small></span></label>';
+  });
+  $("rotation").innerHTML = h;
+  $("rotation").querySelectorAll("input").forEach(function(c){ c.addEventListener("change", function(){ var p = c.getAttribute("data-rot").split("|"); S.rotation = (S.rotation || []).filter(function(x){ return !(x.t === p[0] && x.area === p[1]); }); if(c.checked) S.rotation.push({ t:p[0], area:p[1] }); c.closest(".check").classList.toggle("done", c.checked); persist(); }); });
+}
+renderRotation();
 
 /* ---------- photos ---------- */
 var pendingArea = "";   /* area key, or "fu" for follow-up photos */
@@ -277,14 +316,14 @@ renderResume();
 /* Saved progress from earlier today (or an unfinished day) comes back as it was left. */
 function renderRestored(){
   if(!RESTORED) return;
-  var touched = S.property || S.porter || S.areas.some(function(a){ return a.photos.length || a.tasks.some(function(t){ return t.done; }); }) || S.passes.some(function(p){ return p.done; });
+  var touched = S.property || S.porter || S.areas.some(function(a){ return a.on || a.photos.length; });
   if(!touched) return;
   var c = counts();
   var stale = S.service_date && S.service_date !== OV.today();
   var el = document.createElement("div");
   el.className = "note " + (stale ? "warn" : "ok"); el.id = "restoredNote";
-  el.innerHTML = "<b>Picking up where you left off.</b> " + (S.property ? esc(S.property) + ", " : "") + esc(S.weekday || OV.weekday(S.service_date)) + " " + esc(S.service_date) + " · " + c.done + " of " + c.total + " areas done · " + c.photos + " photo" + (c.photos === 1 ? "" : "s") + "." +
-    (stale ? " <b>This checklist is dated " + esc(S.service_date) + ", not today.</b> Submit it if it is finished, or tap Start over for today." : " Keep adding as you go. Everything stays on this phone until you submit.");
+  el.innerHTML = "<b>Picking up where you left off.</b> " + (S.property ? esc(S.property) + ", " : "") + esc(S.weekday || OV.weekday(S.service_date)) + " " + esc(S.service_date) + " · " + c.on + " area" + (c.on === 1 ? "" : "s") + " reported · " + c.photos + " photo" + (c.photos === 1 ? "" : "s") + "." +
+    (stale ? " <b>This report is dated " + esc(S.service_date) + ", not today.</b> Submit it if it is finished, or tap Start over for today." : " Keep adding as you go. Everything stays on this phone until you submit.");
   $("resume").appendChild(el);
 }
 renderRestored();
@@ -294,41 +333,32 @@ function validateForm(){
   if(!S.property) return "Pick the property.";
   if(!S.service_date) return "Pick the date.";
   if(!String(S.porter || "").trim()) return "Enter your name.";
-  var nothing = S.areas.filter(function(a){ return !a.na && !a.tasks.some(function(t){ return t.done; }); });
-  if(nothing.length) return "No tasks are checked in: " + nothing.map(function(a){ return a.name; }).join(", ") + ". Check what you did, or mark the area Not today.";
+  var on = S.areas.filter(function(a){ return a.on; });
+  if(!on.length) return "Check off at least one area you got to today.";
+  var noStatus = on.filter(function(a){ return !a.status; });
+  if(noStatus.length) return "Say what kind of clean it was in: " + noStatus.map(function(a){ return a.name; }).join(", ") + ".";
   if(!$("confirm").checked) return "Tick the confirmation box.";
   return "";
 }
-/* Photos are asked for, not forced. Before submit, say which areas have none and let the porter choose. */
-function photoWarning(){
-  var missing = S.areas.filter(function(a){ if(a.na) return false; var def = areaDef(a.key); return !def.photoOptional && a.photos.length < 1; });
-  var total = counts().photos;
-  if(!missing.length) return null;
-  return { missing: missing, total: total };
-}
-function showPhotoWarning(w, onSubmitAnyway){
+/* Photos are asked for, not forced. The only warning is when there are none at all. */
+function showPhotoWarning(onSubmitAnyway){
   var m = document.createElement("div"); m.className = "modal";
-  var title = w.total === 0 ? "No photos attached" : "Some areas have no photo";
-  var body = w.total === 0
-    ? "This checklist has no photos. Photos are how the property sees the work was done. Go back and add 1 or 2 per area if you can."
-    : "These areas have no photo yet: <b>" + w.missing.map(function(a){ return esc(a.name); }).join("</b>, <b>") + "</b>. Each area should have 1 or 2 photos.";
-  m.innerHTML = '<div class="box"><h3 style="font-size:1.1rem;margin-bottom:8px">' + title + '</h3><div class="note warn" style="margin:0 0 14px">' + body + '</div>' +
+  m.innerHTML = '<div class="box"><h3 style="font-size:1.1rem;margin-bottom:8px">No photos attached</h3><div class="note warn" style="margin:0 0 14px">This report has no photos. Photos are how the property sees the work was done. Add one or two if you can.</div>' +
     '<div class="btnrow"><button type="button" class="btn dark" id="pwBack">Go back and add photos</button><button type="button" class="btn ghost" id="pwGo">Submit without photos</button></div></div>';
   document.body.appendChild(m);
-  $("pwBack").addEventListener("click", function(){ m.remove(); var first = w.missing[0]; open[first.key] = true; renderAreas(); var el = $("areas").querySelector('.area[data-k="' + first.key + '"]'); if(el) el.scrollIntoView({ behavior:"smooth", block:"start" }); });
+  $("pwBack").addEventListener("click", function(){ m.remove(); var first = S.areas.filter(function(a){ return a.on; })[0]; var el = first && $("areas").querySelector('.area[data-k="' + first.key + '"]'); if(el) el.scrollIntoView({ behavior:"smooth", block:"start" }); });
   $("pwGo").addEventListener("click", function(){ m.remove(); onSubmitAnyway(); });
 }
 $("submit").addEventListener("click", function(){
   var e = validateForm(); $("ferr").textContent = e;
   if(e){ $("ferr").scrollIntoView({ behavior:"smooth", block:"center" }); return; }
-  var w = photoWarning();
-  if(w) showPhotoWarning(w, doSubmit); else doSubmit();
+  if(counts().photos === 0) showPhotoWarning(doSubmit); else doSubmit();
 });
 function doSubmit(){
   var btn = $("submit"); btn.disabled = true; btn.textContent = "Submitting...";
   try { localStorage.setItem("cwOvPorter", S.porter); } catch(e2){}
   var doc = JSON.parse(JSON.stringify(S));
-  doc.areas.forEach(function(a){ delete a._touched; a.photos.forEach(function(p){ delete p._mem; }); });
+  doc.areas.forEach(function(a){ a.photos.forEach(function(p){ delete p._mem; }); });
   doc.submitted_at = new Date().toISOString();
   var all = [];
   doc.areas.forEach(function(a){ a.photos.forEach(function(p){ all.push({ pid:p.pid, area:a.name }); }); });
@@ -339,7 +369,7 @@ function doSubmit(){
     OV.clearDraft("checklist");
     $("form").classList.add("hidden"); $("bar").classList.add("hidden"); $("doneWrap").classList.remove("hidden"); window.scrollTo(0, 0);
     $("doneRef").textContent = id;
-    $("doneText").textContent = S.weekday + " checklist for " + S.property + " is in. Your Facility Solutions Manager reviews it and sends the report to the property.";
+    $("doneText").textContent = S.weekday + " report for " + S.property + " is in. Your Facility Solutions Manager reviews it and sends the report to the property.";
     if(!all.length) return;
     $("donePhotos").innerHTML = '<div class="note info" id="pstat">Uploading ' + all.length + ' photos. Keep this page open.</div><div class="progress"><i id="pbar"></i></div>';
     var pending = all.map(function(p){ return p.pid; });
@@ -361,7 +391,7 @@ function doSubmit(){
       $("pstat").textContent = pending.length ? pending.length + " photo(s) did not upload. Open this page again on a good signal and tap Upload now." : "All photos uploaded. You are done.";
     });
   }).catch(function(err){
-    btn.disabled = false; btn.textContent = "Submit checklist";
+    btn.disabled = false; btn.textContent = "Submit report";
     var m = String(err && err.message || err);
     if(/passcode/i.test(m)) return OV.locked(m);
     $("ferr").textContent = /fetch|network|json/i.test(m) ? "Could not reach City Wide. Check your signal and tap Submit again. Nothing is lost." : m;
@@ -380,16 +410,15 @@ $("reset").addEventListener("click", function(){
   clearTimeout(resetArmed); resetArmed = null;
   var oldId = S.id;
   OV.clearDraft("checklist"); OV.photoDrop(oldId + ":");
-  S = blank(); THUMBS = {}; open = {};
+  S = blank(); THUMBS = {}; moreOpen = {};
   $("prop").value = ""; $("date").value = S.service_date; $("porter").value = ""; $("start").value = ""; $("end").value = "";
   $("followups").value = ""; $("supplies").value = ""; $("confirm").checked = false; $("ferr").textContent = "";
   RESTORED = null; var rn = $("restoredNote"); if(rn) rn.remove();
-  applyPropertyDefaults(); dayline(); renderPasses(); renderFu(); renderAreas(); renderFuPhotos();
+  dayline(); renderFu(); renderAreas(); renderRotation(); renderFuPhotos();
   b.textContent = "Start over"; b.classList.add("ghost"); b.classList.remove("dark");
   window.scrollTo({ top:0, behavior:"smooth" });
 });
 
-applyPropertyDefaults();
 restoreThumbs().then(function(){ renderAreas(); renderFuPhotos(); });
 renderAreas(); renderFuPhotos();
 })();
