@@ -14,7 +14,9 @@
      Saves to the phone as the porter works (localStorage + IndexedDB photos), then kind ov_submit
      and ov_photo_put one photo at a time. No email. The FSM reviews it in review.html.
      Submission shape: v:2, areas[].on / status / times / tasks[{t,n}] / note / floors / photos,
-     rotation[{t,area}]. Old submissions (no v) keep the task-list shape and still render. -->
+     rotation[{t,area}]. Old submissions (no v) keep the task-list shape and still render.
+     Nov 2 2026: optional building 1 to 4 on every area (areas[].building, uid), "Add this area for another
+     building" makes a second entry for the same area. The name carries the building, e.g. "Building 2 · Restrooms". -->
 <link rel="icon" type="image/png" sizes="32x32" href="https://citywidelv.github.io/cw-ops-desk/favicon-32x32.png">
 <link rel="stylesheet" href="ov.css">
 <style>
@@ -36,6 +38,9 @@
 .q{font-size:14px;font-weight:700;margin:12px 0 6px}
 .q small{display:block;font-weight:400;color:var(--grey);font-size:12px;margin-top:2px}
 .stat{display:flex;gap:8px;flex-wrap:wrap}
+.bldrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.bldrow [data-again]{color:var(--red);font-weight:700}
+.bldrow .rmarea{color:var(--grey)}
 .stat .chip{flex:1 1 30%;justify-content:center;text-align:center;min-height:46px;font-size:14px}
 .times{display:flex;gap:8px;flex-wrap:wrap}
 .times .chip{min-width:54px;justify-content:center;min-height:42px}
@@ -138,7 +143,7 @@ var FU = ["Light out", "Damage", "Graffiti", "Safety hazard", "Dumpster overflow
 /* ---------- state ---------- */
 function blank(){
   return { id: OV.uid("ovc_"), v:2, property:"", service_date: OV.today(), weekday:"", porter:"", shift_start:"", shift_end:"",
-    areas: AREAS.map(function(a){ return { key:a.key, name:a.name, on:false, status:"", times:"", tasks:[], note:"", floors:"", photos:[] }; }),
+    areas: AREAS.map(function(a){ return { uid:a.key, key:a.key, name:a.name, building:"", on:false, status:"", times:"", tasks:[], note:"", floors:"", photos:[] }; }),
     rotation: [],
     followups:"", followup_tags:[], photos:[], supplies:"", status:"New" };
 }
@@ -146,6 +151,8 @@ var RESTORED = OV.loadDraft("checklist");
 var S = RESTORED || blank();
 /* a draft from the old checklist shape cannot be finished here; start clean */
 if(!S.id || !/^ovc_/.test(S.id) || Number(S.v) < 2){ S = blank(); RESTORED = null; }
+/* drafts saved before buildings existed: every area gets its own id and an empty building */
+S.areas.forEach(function(a){ if(!a.uid) a.uid = a.key; if(a.building == null) a.building = ""; });
 var THUMBS = {};   /* pid -> thumb data uri, memory only */
 var moreOpen = {}; /* area key -> full task list shown */
 
@@ -176,7 +183,22 @@ renderFu();
 
 /* ---------- areas ---------- */
 function areaDef(key){ return AREAS.filter(function(a){ return a.key === key; })[0]; }
-function find(key){ return S.areas.filter(function(a){ return a.key === key; })[0]; }
+function find(uid){ return S.areas.filter(function(a){ return a.uid === uid; })[0]; }
+/* Optional building number per area (Nov 2 2026, from Jake and Luigi). Multi-building properties can say which
+   building's lobby or restroom they did, and log the same area again for another building. The building goes into
+   the area name ("Building 2 · Restrooms") so every report, PDF and digest shows it with no backend change. */
+var BLDGS = ["1", "2", "3", "4"];
+function label(a){ var def = areaDef(a.key); return (a.building ? "Building " + a.building + " · " : "") + (def ? def.name : a.name); }
+function addBuilding(a){
+  var used = S.areas.filter(function(x){ return x.key === a.key; }).map(function(x){ return x.building; });
+  var next = BLDGS.filter(function(b){ return used.indexOf(b) < 0; })[0] || "";
+  var copy = { uid: a.key + "_" + Date.now().toString(36), key:a.key, name:"", building:next, on:true, status:"", times:"", tasks:[], note:"", floors:"", photos:[] };
+  copy.name = label(copy);
+  var at = S.areas.indexOf(a), last = at;
+  S.areas.forEach(function(x, i){ if(x.key === a.key && i > last) last = i; });
+  S.areas.splice(last + 1, 0, copy);
+  return copy;
+}
 function visible(a){
   var def = areaDef(a.key);
   if(!def.midOnly) return true;
@@ -200,28 +222,31 @@ function renderAreas(){
   var host = $("areas");
   host.innerHTML = S.areas.filter(visible).map(function(a, idx){
     var def = areaDef(a.key), hs = headStatus(a);
-    var h = '<div class="area' + (a.on ? ' on' : ' closed') + '" data-k="' + a.key + '">';
-    h += '<div class="ahead" data-toggle="' + a.key + '"><div class="num">' + (idx + 1) + '</div><div class="t"><b>' + esc(a.name) + '</b>' + (hs.st ? '<small class="' + hs.cls + '">' + esc(hs.st) + '</small>' : (def.sub ? '<small>' + esc(def.sub) + '</small>' : '')) + '</div><div class="box">' + (a.on ? '&#10003;' : '') + '</div></div>';
+    var h = '<div class="area' + (a.on ? ' on' : ' closed') + '" data-k="' + a.uid + '">';
+    h += '<div class="ahead" data-toggle="' + a.uid + '"><div class="num">' + (idx + 1) + '</div><div class="t"><b>' + esc(a.name) + '</b>' + (hs.st ? '<small class="' + hs.cls + '">' + esc(hs.st) + '</small>' : (def.sub ? '<small>' + esc(def.sub) + '</small>' : '')) + '</div><div class="box">' + (a.on ? '&#10003;' : '') + '</div></div>';
     h += '<div class="abody">';
-    h += '<div class="q">What kind of clean was it?</div><div class="stat">' + ["full", "spot", "none"].map(function(s){ return '<button type="button" class="chip' + (a.status === s ? ' on' : '') + '" data-status="' + a.key + ':' + s + '">' + (s === "full" ? "Full clean" : s === "spot" ? "Spot check" : "Did not need it") + '</button>'; }).join("") + '</div>';
-    h += '<div class="q">How many times did you get to this today?<small>Leave blank if once is all it needs. Tap a number if you went back.</small></div><div class="times">' + TIMES.map(function(t){ return '<button type="button" class="chip' + (a.times === t ? ' on' : '') + '" data-times="' + a.key + ':' + t + '">' + t + '</button>'; }).join("") + '</div>';
+    var extra = a.uid !== a.key;
+    h += '<div class="q">Which building?<small>Optional. Skip it if the property has one building.</small></div><div class="times bld">' + BLDGS.map(function(b){ return '<button type="button" class="chip' + (a.building === b ? ' on' : '') + '" data-bld="' + a.uid + ':' + b + '">' + b + '</button>'; }).join("") + '</div>';
+    h += '<div class="q">What kind of clean was it?</div><div class="stat">' + ["full", "spot", "none"].map(function(s){ return '<button type="button" class="chip' + (a.status === s ? ' on' : '') + '" data-status="' + a.uid + ':' + s + '">' + (s === "full" ? "Full clean" : s === "spot" ? "Spot check" : "Did not need it") + '</button>'; }).join("") + '</div>';
+    h += '<div class="q">How many times did you get to this today?<small>Leave blank if once is all it needs. Tap a number if you went back.</small></div><div class="times">' + TIMES.map(function(t){ return '<button type="button" class="chip' + (a.times === t ? ' on' : '') + '" data-times="' + a.uid + ':' + t + '">' + t + '</button>'; }).join("") + '</div>';
     if(a.status === "spot" || a.status === "full"){
       var list = QUICK[a.key] || [];
-      var showAll = !!moreOpen[a.key] || a.status === "spot";
+      var showAll = !!moreOpen[a.uid] || a.status === "spot";
       h += '<div class="q">' + (a.status === "spot" ? "What did you touch?" : "Anything to call out?") + '<small>' + (a.status === "spot" ? "Tap what you did. Tap + if you did it more than once." : "Optional. A full clean already covers the whole area.") + '</small></div>';
       if(showAll){
-        h += '<div class="tasks2">' + list.map(function(t){ var n = taskN(a, t); return '<div class="trow' + (n ? ' on' : '') + '"><button type="button" class="chip' + (n ? ' on' : '') + '" data-task="' + a.key + '|' + esc(t) + '">' + esc(t) + '</button><span class="n"><button type="button" data-minus="' + a.key + '|' + esc(t) + '" aria-label="One less">&minus;</button><b>&times;' + n + '</b><button type="button" data-plus="' + a.key + '|' + esc(t) + '" aria-label="One more">+</button></span></div>'; }).join("") + '</div>';
+        h += '<div class="tasks2">' + list.map(function(t){ var n = taskN(a, t); return '<div class="trow' + (n ? ' on' : '') + '"><button type="button" class="chip' + (n ? ' on' : '') + '" data-task="' + a.uid + '|' + esc(t) + '">' + esc(t) + '</button><span class="n"><button type="button" data-minus="' + a.uid + '|' + esc(t) + '" aria-label="One less">&minus;</button><b>&times;' + n + '</b><button type="button" data-plus="' + a.uid + '|' + esc(t) + '" aria-label="One more">+</button></span></div>'; }).join("") + '</div>';
       } else {
         var picked = (a.tasks || []).map(function(x){ return x.t + (x.n > 1 ? " ×" + x.n : ""); });
-        h += (picked.length ? '<div class="summary-line">' + esc(picked.join(", ")) + '</div>' : '') + '<button type="button" class="more" data-more="' + a.key + '">' + (picked.length ? "Change" : "Add detail") + '</button>';
+        h += (picked.length ? '<div class="summary-line">' + esc(picked.join(", ")) + '</div>' : '') + '<button type="button" class="more" data-more="' + a.uid + '">' + (picked.length ? "Change" : "Add detail") + '</button>';
       }
     }
-    if(def.askFloors) h += '<div class="field" style="margin-top:10px"><label>Which hallway floors did you do today?</label><input type="text" data-floors="' + a.key + '" value="' + esc(a.floors || "") + '" placeholder="Building 1 floors 2 and 3"></div>';
+    if(def.askFloors) h += '<div class="field" style="margin-top:10px"><label>Which hallway floors did you do today?</label><input type="text" data-floors="' + a.uid + '" value="' + esc(a.floors || "") + '" placeholder="Building 1 floors 2 and 3"></div>';
     h += '<div class="photos"><div class="grp">Photos' + (def.photoOptional ? ' (optional)' : ' (1 to 2)') + '</div><div class="pgrid">';
-    a.photos.forEach(function(p, i){ h += '<div class="ph"><img src="' + (THUMBS[p.pid] || "") + '" alt=""><button type="button" class="rm" data-rm="' + a.key + ':' + i + '" aria-label="Remove photo">&times;</button></div>'; });
-    if(a.photos.length < 2) h += '<div class="add" data-add="' + a.key + '"><span class="big">+</span>' + (a.photos.length ? 'Add 2nd photo' : 'Take or upload photo') + '</div>';
+    a.photos.forEach(function(p, i){ h += '<div class="ph"><img src="' + (THUMBS[p.pid] || "") + '" alt=""><button type="button" class="rm" data-rm="' + a.uid + ':' + i + '" aria-label="Remove photo">&times;</button></div>'; });
+    if(a.photos.length < 2) h += '<div class="add" data-add="' + a.uid + '"><span class="big">+</span>' + (a.photos.length ? 'Add 2nd photo' : 'Take or upload photo') + '</div>';
     h += '</div></div>';
-    h += '<div class="field" style="margin-top:10px"><label>Note for this area (optional)</label><input type="text" data-note="' + a.key + '" value="' + esc(a.note || "") + '" placeholder="Anything the property should know"></div>';
+    h += '<div class="field" style="margin-top:10px"><label>Note for this area (optional)</label><input type="text" data-note="' + a.uid + '" value="' + esc(a.note || "") + '" placeholder="Anything the property should know"></div>';
+    h += '<div class="bldrow">' + (a.building ? '<button type="button" class="more" data-again="' + a.uid + '">+ Add this area for another building</button>' : '') + (extra ? '<button type="button" class="more rmarea" data-drop="' + a.uid + '">Remove this one</button>' : '') + '</div>';
     h += '</div></div>';
     return h;
   }).join("");
@@ -229,12 +254,15 @@ function renderAreas(){
 }
 function wire(){
   var host = $("areas");
-  host.querySelectorAll("[data-toggle]").forEach(function(el){ el.addEventListener("click", function(){ var a = find(el.getAttribute("data-toggle")); a.on = !a.on; if(!a.on){ a.status = ""; a.times = ""; a.tasks = []; } renderAreas(); persist(); if(a.on){ var box = host.querySelector('.area[data-k="' + a.key + '"]'); if(box) box.scrollIntoView({ behavior:"smooth", block:"start" }); } }); });
+  host.querySelectorAll("[data-toggle]").forEach(function(el){ el.addEventListener("click", function(){ var a = find(el.getAttribute("data-toggle")); a.on = !a.on; if(!a.on){ a.status = ""; a.times = ""; a.tasks = []; } renderAreas(); persist(); if(a.on){ var box = host.querySelector('.area[data-k="' + a.uid + '"]'); if(box) box.scrollIntoView({ behavior:"smooth", block:"start" }); } }); });
   host.querySelectorAll("[data-status]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-status").split(":"); var a = find(p[0]); a.status = a.status === p[1] ? "" : p[1]; if(a.status === "none") a.tasks = []; renderAreas(); persist(); }); });
   host.querySelectorAll("[data-times]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-times").split(":"); var a = find(p[0]); a.times = a.times === p[1] ? "" : p[1]; renderAreas(); persist(); }); });
   host.querySelectorAll("[data-task]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-task").split("|"); var a = find(p[0]); setTask(a, p[1], taskN(a, p[1]) ? 0 : 1); renderAreas(); persist(); }); });
   host.querySelectorAll("[data-plus]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-plus").split("|"); var a = find(p[0]); setTask(a, p[1], Math.min(9, taskN(a, p[1]) + 1)); renderAreas(); persist(); }); });
   host.querySelectorAll("[data-minus]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-minus").split("|"); var a = find(p[0]); setTask(a, p[1], taskN(a, p[1]) - 1); renderAreas(); persist(); }); });
+  host.querySelectorAll("[data-bld]").forEach(function(b){ b.addEventListener("click", function(){ var p = b.getAttribute("data-bld").split(":"); var a = find(p[0]); a.building = a.building === p[1] ? "" : p[1]; a.name = label(a); renderAreas(); persist(); }); });
+  host.querySelectorAll("[data-again]").forEach(function(b){ b.addEventListener("click", function(){ var c = addBuilding(find(b.getAttribute("data-again"))); renderAreas(); persist(); var box = host.querySelector('.area[data-k="' + c.uid + '"]'); if(box) box.scrollIntoView({ behavior:"smooth", block:"start" }); }); });
+  host.querySelectorAll("[data-drop]").forEach(function(b){ b.addEventListener("click", function(){ var a = find(b.getAttribute("data-drop")); if(a.photos.length && !confirm("Remove this area and its photos from the report?")) return; a.photos.forEach(function(ph){ delete THUMBS[ph.pid]; OV.photoDrop(S.id + ":" + ph.pid); }); S.areas.splice(S.areas.indexOf(a), 1); renderAreas(); persist(); }); });
   host.querySelectorAll("[data-more]").forEach(function(b){ b.addEventListener("click", function(){ moreOpen[b.getAttribute("data-more")] = true; renderAreas(); }); });
   host.querySelectorAll("[data-floors]").forEach(function(i){ i.addEventListener("input", function(){ find(i.getAttribute("data-floors")).floors = i.value; persist(); }); });
   host.querySelectorAll("[data-note]").forEach(function(i){ i.addEventListener("input", function(){ find(i.getAttribute("data-note")).note = i.value; persist(); }); });
@@ -262,7 +290,7 @@ function renderRotation(){
 renderRotation();
 
 /* ---------- photos ---------- */
-var pendingArea = "";   /* area key, or "fu" for follow-up photos */
+var pendingArea = "";   /* area uid, or "fu" for follow-up photos */
 $("pfile").addEventListener("change", function(){
   var f = $("pfile").files && $("pfile").files[0]; if(!f) return;
   var target = pendingArea; pendingArea = "";
@@ -346,7 +374,7 @@ function showPhotoWarning(onSubmitAnyway){
   m.innerHTML = '<div class="box"><h3 style="font-size:1.1rem;margin-bottom:8px">No photos attached</h3><div class="note warn" style="margin:0 0 14px">This report has no photos. Photos are how the property sees the work was done. Add one or two if you can.</div>' +
     '<div class="btnrow"><button type="button" class="btn dark" id="pwBack">Go back and add photos</button><button type="button" class="btn ghost" id="pwGo">Submit without photos</button></div></div>';
   document.body.appendChild(m);
-  $("pwBack").addEventListener("click", function(){ m.remove(); var first = S.areas.filter(function(a){ return a.on; })[0]; var el = first && $("areas").querySelector('.area[data-k="' + first.key + '"]'); if(el) el.scrollIntoView({ behavior:"smooth", block:"start" }); });
+  $("pwBack").addEventListener("click", function(){ m.remove(); var first = S.areas.filter(function(a){ return a.on; })[0]; var el = first && $("areas").querySelector('.area[data-k="' + first.uid + '"]'); if(el) el.scrollIntoView({ behavior:"smooth", block:"start" }); });
   $("pwGo").addEventListener("click", function(){ m.remove(); onSubmitAnyway(); });
 }
 $("submit").addEventListener("click", function(){
@@ -358,7 +386,9 @@ function doSubmit(){
   var btn = $("submit"); btn.disabled = true; btn.textContent = "Submitting...";
   try { localStorage.setItem("cwOvPorter", S.porter); } catch(e2){}
   var doc = JSON.parse(JSON.stringify(S));
-  doc.areas.forEach(function(a){ a.photos.forEach(function(p){ delete p._mem; }); });
+  /* extra building copies the porter never ticked are dropped; names carry the building */
+  doc.areas = doc.areas.filter(function(a){ return a.on || a.uid === a.key; });
+  doc.areas.forEach(function(a){ a.name = label(a); a.photos.forEach(function(p){ delete p._mem; }); });
   doc.submitted_at = new Date().toISOString();
   var all = [];
   doc.areas.forEach(function(a){ a.photos.forEach(function(p){ all.push({ pid:p.pid, area:a.name }); }); });
