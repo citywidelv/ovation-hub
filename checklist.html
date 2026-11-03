@@ -13,6 +13,7 @@
      Photos stay 1 to 2 per area; the only warning before submit is when there are no photos at all.
      Saves to the phone as the porter works (localStorage + IndexedDB photos), then kind ov_submit
      and ov_photo_put one photo at a time. No email. The FSM reviews it in review.html.
+     build 2026-11-02: photo uploads retry three times each and the done screen says loudly not to close the page until every photo is in.
      Submission shape: v:2, areas[].on / status / times / tasks[{t,n}] / note / floors / photos,
      rotation[{t,area}]. Old submissions (no v) keep the task-list shape and still render.
      Nov 2 2026: optional building 1 to 4 on every area (areas[].building, uid), "Add this area for another
@@ -335,7 +336,9 @@ function resumeUpload(id, btn){
   var list = unsentList(); var u = list.filter(function(x){ return x.id === id; })[0]; if(!u) return;
   btn.disabled = true; btn.textContent = "Uploading...";
   var items = u.pending.slice();
-  items.reduce(function(chain, pid){ return chain.then(function(){ return OV.photoLoad(id + ":" + pid).then(function(d){ if(!d){ u.pending = u.pending.filter(function(x){ return x !== pid; }); return; } return OV.api("ov_photo_put", { id:id, pid:pid, data:d }).then(function(r){ if(r && r.ok){ u.pending = u.pending.filter(function(x){ return x !== pid; }); OV.photoDrop(id + ":" + pid); } }); }); }); }, Promise.resolve())
+  function wait(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+  function put(pid, d, tries){ return OV.api("ov_photo_put", { id:id, pid:pid, data:d }).then(function(r){ return !!(r && r.ok); }).catch(function(){ return false; }).then(function(ok){ if(ok || tries <= 1) return ok; return wait(2500).then(function(){ return put(pid, d, tries - 1); }); }); }
+  items.reduce(function(chain, pid, i){ return chain.then(function(){ btn.textContent = "Uploading " + (i + 1) + " of " + items.length + "..."; return OV.photoLoad(id + ":" + pid).then(function(d){ if(!d){ u.pending = u.pending.filter(function(x){ return x !== pid; }); return; } return put(pid, d, 3).then(function(ok){ if(ok){ u.pending = u.pending.filter(function(x){ return x !== pid; }); OV.photoDrop(id + ":" + pid); } }); }); }); }, Promise.resolve())
     .then(function(){ setUnsent(u.pending.length ? list : list.filter(function(x){ return x.id !== id; })); renderResume(); })
     .catch(function(){ setUnsent(list); renderResume(); });
 }
@@ -401,24 +404,33 @@ function doSubmit(){
     $("doneRef").textContent = id;
     $("doneText").textContent = S.weekday + " report for " + S.property + " is in. Your Facility Solutions Manager reviews it and sends the report to the property.";
     if(!all.length) return;
-    $("donePhotos").innerHTML = '<div class="note info" id="pstat">Uploading ' + all.length + ' photos. Keep this page open.</div><div class="progress"><i id="pbar"></i></div>';
+    /* Nov 2 2026: photos go up one at a time after the report is saved. A porter who closed the page here
+       left the rest behind, and the FSM then saw "not uploaded". So: the warning is loud, each photo gets
+       three tries with a pause between, and the done line only says done when every photo is in. */
+    $("donePhotos").innerHTML = '<div class="note warn" id="pstat"><b>Do not close this page yet.</b> Uploading ' + all.length + ' photo' + (all.length === 1 ? '' : 's') + '. This can take a minute on a weak signal.</div><div class="progress"><i id="pbar"></i></div>';
     var pending = all.map(function(p){ return p.pid; });
     setUnsent(unsentList().concat([{ id:id, property:S.property, service_date:S.service_date, pending:pending }]));
+    function wait(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+    function putPhoto(pid, d, tries){
+      return OV.api("ov_photo_put", { id:id, pid:pid, data:d }).then(function(rr){ return !!(rr && rr.ok); }).catch(function(){ return false; })
+        .then(function(ok){ if(ok || tries <= 1) return ok; return wait(2500).then(function(){ return putPhoto(pid, d, tries - 1); }); });
+    }
     return all.reduce(function(chain, p, i){
       return chain.then(function(){
-        var mem = null; S.areas.forEach(function(a){ a.photos.forEach(function(x){ if(x.pid === p.pid && x._mem) mem = x._mem; }); });
+        $("pstat").innerHTML = '<b>Do not close this page yet.</b> Uploading photo ' + (i + 1) + ' of ' + all.length + '...';
+        var mem = null; S.areas.forEach(function(a){ a.photos.forEach(function(x){ if(x.pid === p.pid && x._mem) mem = x._mem; }); }); (S.photos || []).forEach(function(x){ if(x.pid === p.pid && x._mem) mem = x._mem; });
         return (mem ? Promise.resolve(mem) : OV.photoLoad(id + ":" + p.pid)).then(function(d){
           if(!d) return;
-          return OV.api("ov_photo_put", { id:id, pid:p.pid, data:d }).then(function(rr){
-            if(rr && rr.ok){ pending = pending.filter(function(x){ return x !== p.pid; }); OV.photoDrop(id + ":" + p.pid); }
-          }).catch(function(){});
-        }).then(function(){ $("pbar").style.width = Math.round(((i + 1) / all.length) * 100) + "%"; $("pstat").textContent = "Uploading photo " + (i + 1) + " of " + all.length + "..."; });
+          return putPhoto(p.pid, d, 3).then(function(ok){
+            if(ok){ pending = pending.filter(function(x){ return x !== p.pid; }); OV.photoDrop(id + ":" + p.pid); }
+          });
+        }).then(function(){ $("pbar").style.width = Math.round(((i + 1) / all.length) * 100) + "%"; });
       });
     }, Promise.resolve()).then(function(){
       var list = unsentList().map(function(u){ if(u.id === id) u.pending = pending; return u; }).filter(function(u){ return u.pending.length; });
       setUnsent(list);
       $("pstat").className = "note " + (pending.length ? "warn" : "ok");
-      $("pstat").textContent = pending.length ? pending.length + " photo(s) did not upload. Open this page again on a good signal and tap Upload now." : "All photos uploaded. You are done.";
+      $("pstat").innerHTML = pending.length ? '<b>' + pending.length + ' photo' + (pending.length === 1 ? '' : 's') + ' did not upload.</b> Open this page again on a good signal and tap Upload now. The report itself is in.' : '<b>All ' + all.length + ' photos uploaded.</b> You are done.';
     });
   }).catch(function(err){
     btn.disabled = false; btn.textContent = "Submit report";

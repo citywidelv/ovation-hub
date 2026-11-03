@@ -240,7 +240,7 @@ function paintDetail(){
     if((d.rotation || []).length){
       h += '<div class="card plain"><h2 style="font-size:1rem">Weekly and monthly items done today</h2><div class="chips">' + d.rotation.map(function(r, ri){ return '<span class="chip on" style="min-height:32px;padding:5px 10px;font-size:12px">' + esc(r.t) + ' <small style="opacity:.75">(' + esc(r.area) + ')</small> <button type="button" data-rmrot="' + ri + '" style="background:none;border:0;color:#fff;font-weight:700;margin-left:4px;cursor:pointer" aria-label="Remove">&times;</button></span>'; }).join("") + '</div></div>';
     }
-    h += '<div class="card plain"><h2 style="font-size:1rem">Things to report to the property</h2>' + ((d.followup_tags || []).length ? '<div class="chips" style="margin-bottom:8px">' + d.followup_tags.map(function(t){ return '<span class="chip on red" style="min-height:30px;padding:4px 10px;font-size:12px">' + esc(t) + '</span>'; }).join("") + '</div>' : '') +
+    h += '<div class="card plain"><h2 style="font-size:1rem">Things to report to the property</h2>' + ((d.followup_tags || []).length ? '<div class="chips" style="margin-bottom:8px">' + d.followup_tags.map(function(t){ return '<span class="chip on red" style="min-height:30px;padding:4px 10px;font-size:12px">' + esc(t) + '</span>'; }).join("") + '</div>' : '') + fuStatus(d) +
       '<textarea id="fu">' + esc(d.followups || "") + '</textarea>' +
       ((d.photos || []).length ? '<div class="rarea" style="margin-top:10px;border:0"><div class="pgrid" style="grid-template-columns:repeat(4,1fr)">' + d.photos.map(function(p, pi){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div><button type="button" class="rm" data-rmfu="' + pi + '">&times;</button></div>'; }).join("") + '</div></div>' : '') +
       '<h2 style="font-size:1rem;margin-top:14px">Supplies running low</h2><textarea id="sup">' + esc(d.supplies || "") + '</textarea></div>';
@@ -261,7 +261,7 @@ function paintDetail(){
       h += '<div class="field" style="margin:10px 0 0"><input type="text" data-note="' + ai + '" value="' + esc(a.note || "") + '" placeholder="Porter note for this area"></div>';
       h += '</div><div><div class="pgrid">' + a.photos.map(function(p, pi){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div><button type="button" class="rm" data-rm="' + ai + ':' + pi + '" aria-label="Remove photo">&times;</button></div>'; }).join("") + '</div></div></div></div>';
     });
-    h += '<div class="card plain"><h2 style="font-size:1rem">Things to report to the property</h2>' + ((d.followup_tags || []).length ? '<div class="chips" style="margin-bottom:8px">' + d.followup_tags.map(function(t){ return '<span class="chip on red" style="min-height:30px;padding:4px 10px;font-size:12px">' + esc(t) + '</span>'; }).join("") + '</div>' : '') +
+    h += '<div class="card plain"><h2 style="font-size:1rem">Things to report to the property</h2>' + ((d.followup_tags || []).length ? '<div class="chips" style="margin-bottom:8px">' + d.followup_tags.map(function(t){ return '<span class="chip on red" style="min-height:30px;padding:4px 10px;font-size:12px">' + esc(t) + '</span>'; }).join("") + '</div>' : '') + fuStatus(d) +
       '<textarea id="fu">' + esc(d.followups || "") + '</textarea>' +
       ((d.photos || []).length ? '<div class="rarea" style="margin-top:10px;border:0"><div class="pgrid" style="grid-template-columns:repeat(4,1fr)">' + d.photos.map(function(p, pi){ return '<div class="ph" data-pid="' + esc(p.pid) + '"><div class="ld">loading</div><button type="button" class="rm" data-rmfu="' + pi + '">&times;</button></div>'; }).join("") + '</div></div>' : '') +
       '<h2 style="font-size:1rem;margin-top:14px">Supplies running low</h2><textarea id="sup">' + esc(d.supplies || "") + '</textarea></div>';
@@ -305,6 +305,13 @@ function wireDetail(){
   $("bSend").addEventListener("click", sendDialog);
   var rev = $("bRev"); if(rev) rev.addEventListener("click", function(){ d.status = "Reviewed"; save().then(function(){ toast("Marked reviewed"); load(); }); });
   host.querySelectorAll(".ph").forEach(function(el){ el.addEventListener("click", function(e){ if(e.target.closest(".rm")) return; var pid = el.getAttribute("data-pid"); if(S.photos[pid]) lightbox(S.photos[pid]); }); });
+}
+/* Nov 2 2026: what the porter reported to the property is its own alert on the Ops Hub Alerts card (Property
+   notified / Resolved). The mark made there shows here so the FSM knows it was handled. */
+function fuStatus(d){
+  if(d.followup_status) return '<div class="note ok" style="margin:0 0 8px">Marked <b>' + esc(d.followup_status) + '</b>' + (d.followup_by ? ' by ' + esc(d.followup_by) : '') + (d.followup_at ? ' on ' + esc(OV.fmtDate(d.followup_at)) : '') + ' on the Ops Hub Alerts card.</div>';
+  if(d.followups || (d.followup_tags || []).length) return '<div class="note info" style="margin:0 0 8px">Open on the Ops Hub Alerts card until the FSM marks it Property notified or Resolved.</div>';
+  return '';
 }
 function lightbox(src){ var l = document.createElement("div"); l.className = "light"; l.innerHTML = '<img src="' + src + '" alt="">'; l.addEventListener("click", function(){ l.remove(); }); document.body.appendChild(l); }
 
