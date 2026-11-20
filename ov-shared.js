@@ -19,8 +19,9 @@
   var HUB = "https://citywidelv.github.io/ovation-hub/";
   var LOGO = "https://emailer.emfluence.com/clients/citywide/uploadedfiles/signature_logo.png";
 
-  /* Every Ovation community from the May 2026 property list (41 named; the 13th Heirloom
-     community was never identified). awarded = day porter awarded to City Wide. */
+  /* Every Ovation community from the May 2026 property list, plus Heirloom at Bruner (the 13th
+     Heirloom community, added Nov 20 2026). awarded = service awarded to City Wide (day porter,
+     or for Bruner an after-hours clean twice a month), so it shows in the porter dropdowns. */
   var PROPERTIES = [
     { name:"Aspire at Echelon", group:"Mid-Rise", type:"mid", address:"8850 Echelon Point Dr, Las Vegas, NV 89149" },
     { name:"Aspire at Flamingo Grand", group:"Mid-Rise", type:"mid", address:"4335 S Grand Canyon Dr, Las Vegas, NV 89147", awarded:true, days:7 },
@@ -56,6 +57,7 @@
     { name:"Crescendo", group:"Heirloom (55+)", type:"senior", address:"9550 W Russell Rd, Las Vegas, NV 89148" },
     { name:"Ensemble", group:"Heirloom (55+)", type:"senior", address:"2675 W Agate Ave, Las Vegas, NV 89123" },
     { name:"Harmony", group:"Heirloom (55+)", type:"senior", address:"4200 N Tenaya Way, Las Vegas, NV 89129" },
+    { name:"Heirloom at Bruner", group:"Heirloom (55+)", type:"senior", address:"1320 W Bruner Ave, Las Vegas, NV 89183", awarded:true, freq:"2x month" },
     { name:"Heirloom at Pebble", group:"Heirloom (55+)", type:"senior", address:"2325 E Torino Ave, Las Vegas, NV 89123" },
     { name:"Heirloom at Rome", group:"Heirloom (55+)", type:"senior", address:"4850 W Rome Blvd, Las Vegas, NV 89131" },
     { name:"Heirloom at Torrey Pines", group:"Heirloom (55+)", type:"senior", address:"6540 W Arby Ave, Las Vegas, NV 89118" },
